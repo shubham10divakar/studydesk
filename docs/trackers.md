@@ -1,6 +1,6 @@
 # Trackers: submissions, projects, my papers (plan)
 
-Status: **built** (unreleased, under *Unreleased* in CHANGELOG.md). Agreed 2026-11-13; kept simple on purpose, see Decisions at the end. The exact data shape is in [data-model.md](data-model.md) § Trackers JSON.
+Status: **built**, released in 1.3.0. Agreed 2026-11-13; kept simple on purpose, see Decisions at the end. The exact data shape is in [data-model.md](data-model.md) § Trackers JSON.
 
 StudyDesk today records what you read. The trackers record what you *make* and where it goes:
 

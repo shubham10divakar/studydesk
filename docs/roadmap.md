@@ -30,7 +30,7 @@ Still open:
 - [ ] **"Last export" date** kept in the library folder rather than per browser
 - [ ] Search inside the PDFs' own text (Phase 2 does this with FTS5; in the prototype it would mean indexing every page on import)
 
-Trackers (built, not released yet; spec: [trackers.md](trackers.md)):
+Trackers (1.3.0; spec: [trackers.md](trackers.md)):
 - [x] **Submissions tracker**: journals, special issues, book chapters and conferences you could submit to, in your own priority-ordered lists, with deadlines (AoE), APC and zero-APC dates, Scopus or not, status and "mark as submitted"
 - [x] **Projects tracker**: what you're working on, its status, a dated update log (the latest shows on the card), next step, milestones, GitHub and other links; stale projects marked
 - [x] **My papers**: your own manuscripts, linked to their 1st/2nd/3rd choice submissions and their project
@@ -50,6 +50,7 @@ Up to 1.1.1 the package was `pdfdesk`; from 1.2.0 it is `studydesk` (D-013).
 - [x] **1.1.0**: add by link without the PDF, tag suggestions, abstracts (on PyPI)
 - [x] **1.1.1**: last `pdfdesk` release. Ships the README/About wording from b0de801 and a notice that PDFDesk is now StudyDesk; github.com/shubham10divakar/pdfdesk is frozen there
 - [x] **1.2.0**: renamed to StudyDesk (`studydesk` on PyPI); an existing `~/PDFDesk` library is used as it is
+- [x] **1.3.0**: trackers for submissions, projects and my papers, with Upcoming; the library folder is always `~/StudyDesk` (D-015)
 - [ ] **2.x**: platform wheels carrying the Tauri binary (Windows x64, macOS x64 + arm64, Linux x64), built in CI; `studydesk` launches the app. Consider pytauri if the backend should be Python
 - [ ] 2.x first run: offer to import a 1.x export file (or read the 1.x library folder directly)
 - [ ] Optional native installers (`.msi`, `.dmg`) alongside pip

@@ -25,9 +25,7 @@ pip install studydesk && studydesk
 
 ---
 
-## New: trackers for your submissions and projects
-
-Not released yet; coming in the next version.
+## New in 1.3: trackers for your submissions and projects
 
 - 🗓️ **Submissions:** the journals, special issues, book chapter calls and conferences you might submit to, with deadlines (AoE too), APC and zero-APC dates, Scopus or not, your own priority-ordered lists, and *Mark as submitted*.
 - 🛠️ **Projects:** a dated log of updates, next step, milestones, GitHub and other links, and a nudge when an active project goes quiet.
@@ -253,7 +251,7 @@ Upgrade any time with `pip install -U studydesk`.
 
 ## What's coming
 
-StudyDesk is at **1.1**. Next up:
+StudyDesk is at **1.3**. Next up:
 
 - **Recolour instead of duplicate:** highlighting text that's already highlighted will offer to change its colour.
 - **Reference preview:** hover over a citation to read the reference without jumping.

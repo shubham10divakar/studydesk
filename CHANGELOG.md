@@ -2,7 +2,7 @@
 
 All notable changes to StudyDesk (called PDFDesk up to 1.1.1). Versions follow [semantic versioning](https://semver.org/); dates are release dates.
 
-## Unreleased
+## 1.3.0 (2026-11-13)
 
 - **Your library folder is always `StudyDesk`.** StudyDesk no longer uses a `~/PDFDesk` folder (or `PDFDESK_DATA`) by itself. Coming from PDFDesk: rename `PDFDesk` in your home folder to `StudyDesk`, or start with `studydesk --data-dir ~/PDFDesk`. Until you do, `studydesk` prints a reminder each time it starts.
 - **Submissions tracker.** A new *Submissions* section in the sidebar keeps the journals, special issues, book chapter calls and conferences you might submit to: link, deadline (with time and AoE), APC or No APC, zero-APC last date, Scopus or not, topics, notes, and for conferences the abstract, notification and camera-ready dates and the place. Make your own lists; each shows its entries in priority order, and *All submissions* shows them all by nearest deadline. Deadlines a week away are flagged. *Mark as submitted* records the date. Reorder a list by dragging an entry's number, with its arrows, or with `Alt+↑` / `Alt+↓`. Filter by kind, Scopus, status, topic, or *Free to publish now*.
