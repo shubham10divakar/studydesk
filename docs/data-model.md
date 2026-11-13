@@ -2,6 +2,8 @@
 
 ## Prototype JSON
 
+Planned: the submissions, projects and my-papers trackers live in a separate `tracker.json`; their shape is in [trackers.md](trackers.md) § Data and moves here once built.
+
 The same paper objects are stored in two places depending on the mode (architecture.md § Where your data lives):
 - under `studydesk`: `papers` in `<library folder>/library.json`, wrapped as `{"format":"pdfdesk-library","formatVersion":1,"savedAt":"…","papers":[…]}`; `ui` in `localStorage["pdfdesk.ui.v1"]`;
 - on a static server: the whole object below in `localStorage["researchdesk.v1"]`.
