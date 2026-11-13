@@ -26,14 +26,14 @@ Your library is stored in the browser you open it in, for the address `localhost
 Requires Node 18+ (or use `python -m studydesk` from the repo root).
 
 ```bash
-npm run dev          # StudyDesk at http://localhost:5173, library in ~/PDFDesk-test (C:\Users\Subham\PDFDesk-test)
+npm run dev          # StudyDesk at http://localhost:5173, library in ~/StudyDesk-test (C:\Users\Subham\StudyDesk-test)
 npm run dev -- --port 5174   # same, on another port (e.g. while the installed studydesk has 5173)
 npm run dev:static   # prototype/ on a plain static server: browser storage, no library folder
 npm run check        # syntax-check prototype/app.js
 npm test             # server + store unit tests
 ```
 
-Development always uses `~/PDFDesk-test` as the library folder, so test data never mixes with the real `~/StudyDesk`. Click the folder path in the sidebar or on the About page to open it in File Explorer.
+Development always uses `~/StudyDesk-test` as the library folder, so test data never mixes with the real `~/StudyDesk`. Click the folder path in the sidebar or on the About page to open it in File Explorer.
 
 No `npm install` needed. There are no dependencies. PDF.js and the fonts are vendored in `prototype/vendor/`, so it works offline.
 
