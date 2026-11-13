@@ -21,7 +21,7 @@ pip install studydesk && studydesk
 </div>
 
 > [!NOTE]
-> **StudyDesk was called PDFDesk.** It is growing from a PDF reader into a desk for everything you study: links, PDFs, documents and notes. Coming from `pdfdesk`? Run `pip install studydesk && studydesk`: your library in `~/PDFDesk` is used as it is, nothing to export or move. `pdfdesk` 1.1.1 was the last release under the old name.
+> **StudyDesk was called PDFDesk.** It is growing from a PDF reader into a desk for everything you study: links, PDFs, documents and notes. Coming from `pdfdesk`? Install with `pip install studydesk`, then rename your `PDFDesk` folder (in your home folder) to `StudyDesk` before starting it, or start with `studydesk --data-dir ~/PDFDesk`. Nothing to export. `pdfdesk` 1.1.1 was the last release under the old name.
 
 ---
 

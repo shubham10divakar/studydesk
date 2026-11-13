@@ -167,7 +167,7 @@ reference/        how v0.1 was made: original idea notes, design skill, single-f
 
 ## Where data is stored
 
-- **Under `studydesk`:** the library folder (`~/StudyDesk`, or an existing `~/PDFDesk`, or `--data-dir`, or `$STUDYDESK_DATA`): `library.json`, `pdfs/<id>.pdf`, `backups/`. UI state stays in the browser (`localStorage["pdfdesk.ui.v1"]`).
+- **Under `studydesk`:** the library folder (`~/StudyDesk`, or `--data-dir`, or `$STUDYDESK_DATA`; never a PDFDesk folder, D-015): `library.json`, `pdfs/<id>.pdf`, `backups/`. UI state stays in the browser (`localStorage["pdfdesk.ui.v1"]`).
 - **On a static server (`npm run dev`):** browser storage, as in 0.1.x: `localStorage["researchdesk.v1"]` plus IndexedDB `researchdesk`/`files`. The keys keep the old ResearchDesk name so 0.1.x libraries are found and moved in.
 
 Full details, including the API, merging and security: [docs/architecture.md § Where your data lives](docs/architecture.md#where-your-data-lives) and [docs/disk-storage.md](docs/disk-storage.md). Export/import: [docs/export-import.md](docs/export-import.md).

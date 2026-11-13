@@ -1,14 +1,15 @@
-"""Where the library folder is by default, including the move from PDFDesk (decisions.md D-013)."""
+"""Where the library folder is by default (decisions.md D-015): always StudyDesk, never a PDFDesk folder."""
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from studydesk.store import default_dir
+from studydesk.store import default_dir, old_library
 
 
 class DefaultDirTest(unittest.TestCase):
@@ -34,23 +35,36 @@ class DefaultDirTest(unittest.TestCase):
 
     def test_new_install_uses_studydesk(self):
         self.assertEqual(default_dir(), self.home / "StudyDesk")
+        self.assertIsNone(old_library(default_dir()))
 
-    def test_pdfdesk_library_is_used_as_it_is(self):
+    def test_pdfdesk_library_is_never_used(self):
         old = self.pdfdesk_library()
-        self.assertEqual(default_dir(), old)
-
-    def test_empty_pdfdesk_folder_is_ignored(self):
-        (self.home / "PDFDesk").mkdir()
         self.assertEqual(default_dir(), self.home / "StudyDesk")
+        self.assertEqual(old_library(default_dir()), old, "but it is found, so the command can say how to bring it over")
 
-    def test_studydesk_folder_wins_once_it_exists(self):
+    def library(self, papers):
+        new = self.home / "StudyDesk"
+        new.mkdir(exist_ok=True)
+        (new / "library.json").write_text(json.dumps({"papers": papers}), encoding="utf-8")
+        return new
+
+    def test_hint_stays_while_only_examples(self):
+        old = self.pdfdesk_library()
+        new = self.library([{"id": "a", "sample": True}])
+        self.assertEqual(old_library(new), old)
+
+    def test_no_hint_once_studydesk_has_your_papers(self):
         self.pdfdesk_library()
-        (self.home / "StudyDesk").mkdir()
-        self.assertEqual(default_dir(), self.home / "StudyDesk")
+        new = self.library([{"id": "a", "sample": True}, {"id": "b", "title": "Mine"}])
+        self.assertIsNone(old_library(new))
+
+    def test_no_hint_when_using_pdfdesk_on_purpose(self):
+        old = self.pdfdesk_library()
+        self.assertIsNone(old_library(old))
 
     def test_environment_variables(self):
         os.environ["PDFDESK_DATA"] = str(self.home / "old-env")
-        self.assertEqual(default_dir(), self.home / "old-env")
+        self.assertEqual(default_dir(), self.home / "StudyDesk", "PDFDESK_DATA is ignored")
         os.environ["STUDYDESK_DATA"] = str(self.home / "new-env")
         self.assertEqual(default_dir(), self.home / "new-env")
 

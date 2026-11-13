@@ -12,7 +12,7 @@ When StudyDesk runs under the `studydesk` command, the library is a normal folde
 
 ## The folder
 
-Default `~/StudyDesk` (on Windows `C:\Users\<you>\StudyDesk`). If that folder doesn't exist but a PDFDesk library does (`~/PDFDesk` with a `library.json`), that folder is used as it is; `$PDFDESK_DATA` is honoured too (D-013). Change it with `studydesk --data-dir <path>` or the `STUDYDESK_DATA` environment variable. `studydesk` prints the path on startup and the About page shows it.
+Default `~/StudyDesk` (on Windows `C:\Users\<you>\StudyDesk`), always (D-015). A PDFDesk folder (`~/PDFDesk`, `$PDFDESK_DATA`) is never used by itself; while the library folder has none of your own papers (nothing, or only the examples) and `~/PDFDesk` has a `library.json`, `studydesk` prints at every start how to bring it over (rename the folder, or `--data-dir`). Change it with `studydesk --data-dir <path>` or the `STUDYDESK_DATA` environment variable. `studydesk` prints the path on startup and the About page shows it.
 
 ```
 ~/StudyDesk/

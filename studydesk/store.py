@@ -51,15 +51,23 @@ class Conflict(Exception):
 
 
 def default_dir() -> Path:
-    """$STUDYDESK_DATA, else ~/StudyDesk. A PDFDesk library (~/PDFDesk or $PDFDESK_DATA) is used as it is
-    while there is no ~/StudyDesk, so people coming from pdfdesk keep their library without moving it (D-013)."""
-    env = os.environ.get("STUDYDESK_DATA") or os.environ.get("PDFDESK_DATA")
-    if env:
-        return Path(env)
-    new, old = Path.home() / "StudyDesk", Path.home() / "PDFDesk"
-    if not new.exists() and (old / "library.json").exists():
-        return old
-    return new
+    """$STUDYDESK_DATA, else ~/StudyDesk. Never a PDFDesk folder (D-015): an old library is brought over by renaming
+    it, or by passing --data-dir; old_library() lets the command say so."""
+    env = os.environ.get("STUDYDESK_DATA")
+    return Path(env) if env else Path.home() / "StudyDesk"
+
+
+def old_library(root: Path) -> Path | None:
+    """~/PDFDesk, when it has a library and the library folder in use has no papers of its own yet (nothing, or only
+    the example papers): worth a hint at every startup until the user brings it over."""
+    old = Path.home() / "PDFDesk"
+    if Path(root).resolve() == old.resolve() or not (old / "library.json").exists():
+        return None
+    try:
+        papers = json.loads((Path(root) / "library.json").read_text(encoding="utf-8")).get("papers") or []
+    except (OSError, ValueError, AttributeError):
+        papers = []
+    return None if any(isinstance(p, dict) and not p.get("sample") for p in papers) else old
 
 
 def _replace(tmp: str, target: Path) -> None:

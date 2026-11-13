@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from studydesk import __version__, lookup
-from studydesk.store import MAX_IMAGE, Conflict, Store, default_dir
+from studydesk.store import MAX_IMAGE, Conflict, Store, default_dir, old_library
 
 DEFAULT_PORT = 5173
 AUTHOR = "Subham Divakar"
@@ -310,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port to serve on (default {DEFAULT_PORT})")
     parser.add_argument("--data-dir", type=Path, default=None,
-                        help="folder for your library (default: $STUDYDESK_DATA, or StudyDesk in your home folder; an existing PDFDesk folder is used as it is)")
+                        help="folder for your library (default: $STUDYDESK_DATA, or StudyDesk in your home folder)")
     parser.add_argument("--no-browser", action="store_true", help="don't open a browser window")
     parser.add_argument("--verbose", action="store_true", help="log every request")
     parser.add_argument("--version", action="version", version=f"studydesk {__version__}")
@@ -342,6 +342,10 @@ def main(argv: list[str] | None = None) -> int:
     url = f"http://localhost:{args.port}/"
     print(f"StudyDesk {__version__} running at {url}  (Ctrl+C to stop)")
     print(f"Library folder: {store.root}", flush=True)
+    old = old_library(store.root)
+    if old:
+        print(f"Your PDFDesk library is in {old}, and this folder has none of your papers yet. To bring it over, stop StudyDesk (Ctrl+C),\n"
+              f"delete {store.root} (it holds only the example papers) and rename {old} to {store.root}. Or start with: studydesk --data-dir \"{old}\"", flush=True)
     say(f"Built by {AUTHOR} with ♥", f"Built by {AUTHOR} with <3")
     print(f"Feedback and questions: {ISSUES}", flush=True)
     if not args.no_browser:

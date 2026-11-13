@@ -30,7 +30,7 @@ A local-first research paper workspace: library + PDF reader + notes + reading-s
 - Copy in the UI: plain, active voice, name things the way a reader would.
 
 ## How to run / check
-- **Dev servers always use the library folder `C:\Users\Subham\StudyDesk-test`** (`~/StudyDesk-test`, called `~/PDFDesk-test` before 2026-11-13), never the real library (`~/PDFDesk`, which `studydesk` keeps using until `~/StudyDesk` exists) and never a temp/scratch folder. The owner keeps test data there and opens it from the app.
+- **Dev servers always use the library folder `C:\Users\Subham\StudyDesk-test`** (`~/StudyDesk-test`, called `~/PDFDesk-test` before 2026-11-13), never the real library (`~/StudyDesk`; the owner's older one is `~/PDFDesk`, which `studydesk` no longer uses by itself, D-015) and never a temp/scratch folder. The owner keeps test data there and opens it from the app.
 - `npm run dev` → `python -m studydesk --port 5173 --data-dir ~/StudyDesk-test`, http://localhost:5173 (disk mode)
 - `npm run dev:static` → static server for `prototype/` (browser-storage mode, no library folder)
 - `npm test` → server + store unit tests. Automated e2e scripts (`scripts/e2e/`) use their own throwaway folders, which is fine: they delete and recreate them.
