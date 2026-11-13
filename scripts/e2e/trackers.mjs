@@ -3,7 +3,7 @@
 //   chrome --headless=new --remote-debugging-port=9352 --user-data-dir=<temp dir> about:blank
 //   node scripts/e2e/trackers.mjs 9352 <abs empty work dir> [outDir]      (from the repo root)
 import { spawn } from "node:child_process";
-import { rmSync, mkdirSync, readFileSync, existsSync, writeFileSync } from "node:fs";
+import { rmSync, mkdirSync, readFileSync, existsSync, writeFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 const [port, work, out] = process.argv.slice(2);
 const APP_PORT = 5197, app = `http://localhost:${APP_PORT}/`, lib = join(work, "lib");
@@ -276,7 +276,7 @@ try {
   // ---------- upcoming, and the overview cards ----------
   {
     const cur = await (await fetch(app + "api/tracker")).json(), T = cur.tracker, wl = T.lists.find(l => l.section === "submissions");
-    const sub = (id, o) => ({ id, list: wl.id, kind: "journal", title: id, url: "https://example.org/" + id, topics: [], indexing: "unknown", status: "considering", addedAt: Date.now(), updatedAt: Date.now(), ...o });
+    const sub = (id, o) => ({ id, list: wl.id, kind: "journal", title: id, url: "https://example.org/" + encodeURIComponent(id), topics: [], indexing: "unknown", status: "considering", addedAt: Date.now(), updatedAt: Date.now(), ...o });
     T.submissions.push(
       sub("Open journal", { deadline: { date: iso(4) }, zeroApcUntil: iso(40) }),
       sub("Open conf", { kind: "conference", deadline: { date: iso(20) }, conf: { abstract: iso(12), from: iso(90), place: "Kyoto" } }),
@@ -309,6 +309,55 @@ try {
   check(home.includes("Coming up") && home.includes("Projects"), "the overview gets Coming up and Projects");
   check(await A.js(`[...document.querySelectorAll('.sec')].find(s => /Coming up/.test(s.textContent)).querySelectorAll('.up-i').length`) === 5 && /Thesis chapter 3/.test(await A.js(`[...document.querySelectorAll('.sec')].find(s => s.querySelector('h2')?.textContent === "Projects").textContent`)), "Coming up shows the next 5; Projects shows the active one with its stale marker");
   await A.shot("tk-overview");
+
+  // ---------- images ----------
+  {
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAHUlEQVR42mNkYPhfz0AEYBxVSF+FjAwM/xkYGBgAKZgD/Sq4mSkAAAAASUVORK5CYII=", "base64");
+    const pngPath = join(work, "flyer.png"), txtPath = join(work, "notes.txt");
+    writeFileSync(pngPath, png); writeFileSync(txtPath, "not an image");
+    const setFile = async (T, sel, path) => { const d = await T.cdp("DOM.getDocument"); const n = await T.cdp("DOM.querySelector", { nodeId: d.root.nodeId, selector: sel }); await T.cdp("DOM.setFileInputFiles", { nodeId: n.nodeId, files: [path] }); await wait(300); };
+    const imgFiles = () => existsSync(join(lib, "images")) ? readdirSync(join(lib, "images")).filter(f => !f.startsWith(".")) : [];
+    await A.click(btn("tk-subs", "all")); await A.click(byText(".tk-t", "/^Open journal$/"));
+    await setFile(A, "#xfImgIn", txtPath);
+    check(/isn't a PNG, JPEG, WebP or GIF/.test(await A.js(`document.querySelector('#sfMsg').textContent`)) && !(await A.js(`!!document.querySelector('.img-prev')`)), "a file that isn't an image is refused, with a reason");
+    await setFile(A, "#xfImgIn", pngPath);
+    check(await A.js(`!!document.querySelector('.img-prev img[src^="blob:"]') && /Replace image/.test(document.querySelector('#xfImg').textContent)`), "choosing an image shows a preview before saving");
+    await A.click(btn("sub-save")); await wait(800);
+    const sub1 = (await disk()).submissions.find(x => x.title === "Open journal");
+    check(sub1.image && sub1.image.type === "image/png" && readFileSync(join(lib, "images", `${sub1.image.id}.png`)).equals(png), "saved: the image is a file in images/, and the entry points to it");
+    check(await A.js(`(() => { const i = ${byText(".tk-row", "/Open journal/")}.querySelector('.tk-thumb img'); return !!i && i.complete && i.naturalWidth === 16; })()`), "the row shows it as a thumbnail");
+    await A.shot("tk-images");
+    await A.click(`${byText(".tk-row", "/Open journal/")}.querySelector('.tk-thumb')`); await wait(300);
+    check(await A.js(`(() => { const i = document.querySelector('.img-view img'); return !!i && i.naturalWidth === 16; })()`), "clicking the thumbnail shows the image");
+    await A.click(btn("modal-close"));
+    await A.click(byText(".tk-t", "/^Open journal$/")); await setFile(A, "#xfImgIn", pngPath); await A.click(btn("sub-save")); await wait(800);
+    const sub2 = (await disk()).submissions.find(x => x.title === "Open journal");
+    check(sub2.image.id !== sub1.image.id && JSON.stringify(imgFiles()) === JSON.stringify([`${sub2.image.id}.png`]), "replacing the image stores the new one and deletes the old file");
+    await A.click(btn("tk-projs", "all")); await A.click(btn("proj-open", "oldproj01")); await A.click(btn("proj-edit", "oldproj01"));
+    await A.js(`(() => { const dt = new DataTransfer(); dt.items.add(new File([Uint8Array.from(atob(${JSON.stringify(png.toString("base64"))}), c => c.charCodeAt(0))], "shot.png", {type:"image/png"})); document.querySelector('#pfName').dispatchEvent(new ClipboardEvent("paste", {bubbles:true, cancelable:true, clipboardData:dt})); })()`); await wait(300);
+    check(await A.js(`!!document.querySelector('#pfForm .img-prev img[src^="blob:"]')`), "pasting a screenshot into the project form sets its image");
+    await A.click(btn("proj-save")); await wait(900);
+    check(await A.js(`(() => { const i = document.querySelector('.pj-img img'); return !!i && i.naturalWidth === 16; })()`) && imgFiles().length === 2, "the project page shows the image; it's saved next to the other");
+    await A.click(btn("proj-edit", "oldproj01")); await A.click(btn("img-rm"));
+    check(await A.js(`!document.querySelector('#pfForm .img-prev') && /Choose image/.test(document.querySelector('#xfImg').textContent)`), "Remove takes the image off the form");
+    await A.click(btn("proj-save")); await wait(800);
+    check(!(await A.js(`!!document.querySelector('.pj-img')`)) && imgFiles().length === 1 && !(await disk()).projects.find(p => p.id === "oldproj01").image, "saved without it: the file is deleted and the entry has no image");
+    await A.click(btn("tk-subs", "all")); await A.click(byText(".tk-t", "/^Open journal$/")); await A.click(btn("sub-del")); await A.click(btn("sub-del-yes")); await wait(800);
+    check(imgFiles().length === 0, "deleting an entry deletes its image");
+
+    // browser mode (static server): images go to IndexedDB and come back after a reload
+    const st = spawn("node", ["scripts/serve.mjs", "5198"], { stdio: "ignore" }); await wait(1200);
+    try {
+      const C = await tab("http://localhost:5198/");
+      await C.click(btn("tk-subs", "all")); await C.click(btn("sub-new"));
+      await C.fill("sfUrl", "https://static.example.org/call"); await C.fill("sfTitle", "Browser-mode call");
+      await setFile(C, "#xfImgIn", pngPath); await C.click(btn("sub-save")); await wait(600);
+      await C.cdp("Page.reload"); await wait(2000); await C.click(btn("tk-subs", "all")); await wait(400);
+      check(await C.js(`(() => { const i = document.querySelector('.tk-thumb img'); return !!i && i.src.startsWith("blob:") && i.naturalWidth === 16; })()`) && await C.js(`JSON.parse(localStorage.getItem("studydesk.tracker.v1")).submissions[0].title`) === "Browser-mode call", "on a static server the tracker is in localStorage and the image in IndexedDB; both survive a reload");
+      check(!C.errs.length, `no script errors in browser mode (${C.errs.join(" | ")})`);
+      C.close();
+    } finally { st.kill(); }
+  }
 
   await A.cdp("Page.reload"); await wait(2000);
   check(await A.js(`document.querySelector('.tk-nav').innerText.includes("Where to submit")`), "after a reload the sidebar still lists it");

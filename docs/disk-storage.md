@@ -18,7 +18,8 @@ Default `~/StudyDesk` (on Windows `C:\Users\<you>\StudyDesk`). If that folder do
 ~/StudyDesk/
 ├─ library.json              every paper: status, tags, highlights, notes, sessions, bookmarks
 ├─ tracker.json              submissions, projects and my papers (trackers.md); written only once you use them
-├─ pdfs/<paper-id>.pdf       real PDF files, one per paper
+├─ images/<id>.png|jpg|webp|gif   images on submissions and projects (trackers.md)
+├─ pdfs/<paper-id>.pdf       real PDF files, one per paper (and my papers' drafts)
 └─ backups/library-YYYY-MM-DD.json   copy of library.json taken on the first save of each day; last 14 kept (tracker-YYYY-MM-DD.json likewise)
 ```
 
@@ -34,6 +35,7 @@ Default `~/StudyDesk` (on Windows `C:\Users\<you>\StudyDesk`). If that folder do
 | `PUT /api/library` | body `{baseRev, papers}`. Saves if `baseRev` matches the current `rev`, else `409` with the current `{rev, papers}` |
 | `GET /api/tracker` | `{rev, tracker}`: submissions, projects and my papers ([trackers.md](trackers.md)); `tracker` is `null` until first saved |
 | `PUT /api/tracker` | body `{baseRev, tracker}`; same rev check and `409 {rev, tracker}` as the library, with its own rev |
+| `GET` / `PUT` / `DELETE /api/image/<id>` | an image on a tracker entry, `images/<id>.<ext>`. `PUT` takes PNG, JPEG, WebP or GIF only (the first bytes must match the `Content-Type`; no SVG), up to 10 MB; `GET` serves it with `X-Content-Type-Options: nosniff` |
 | `GET /api/pdf/<id>` | the PDF bytes, `404` if missing |
 | `PUT /api/pdf/<id>` | body is the PDF; saved atomically |
 | `DELETE /api/pdf/<id>` | removes it |

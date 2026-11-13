@@ -158,6 +158,7 @@ Keep the calls you collect in one place: journals, special issues, book chapter 
 - **Your own lists, in priority order:** make as many as you like (*Q1 journals*, *Conferences 2027*, *Free until March*), and drag an entry by its number (or use its arrows, or `Alt+↑` / `Alt+↓`) to reorder. *All submissions* shows every list, nearest deadline first.
 - **Filters:** kind, Scopus or not, status (*Not submitted yet*, *Submitted or later*, or one status), topic, and *Free to publish now* (no APC, or still before the zero-APC date).
 - **Mark as submitted** in one click, then follow it from *Considering* to *Accepted* or *Rejected*.
+- **Keep the flyer:** add an image to any entry (or project): choose a file, or paste a screenshot straight into the form. It shows as a thumbnail; click it to see it full size.
 
 ## Keep your projects moving
 
@@ -182,7 +183,7 @@ A *Projects* section for everything you're working on: research, software, open 
 
 *Upcoming* lists every date across the trackers, nearest first: submission and abstract deadlines, zero-APC last dates, notifications, camera-ready dates, conference starts, project milestones and next steps, and your papers' target dates. It's grouped as *Overdue*, *This week*, *Next 30 days* and *Later*, and the sidebar shows how many are due within a week. The Overview adds *Coming up* (the next five) and your active projects with their latest update.
 
-Submissions, projects and your papers are saved in `tracker.json` in your library folder (draft PDFs in `pdfs/`). *Export library* doesn't include them yet.
+Submissions, projects and your papers are saved in `tracker.json` in your library folder (draft PDFs in `pdfs/`, images in `images/`). *Export library* doesn't include them yet.
 
 ## Back up and move your library
 

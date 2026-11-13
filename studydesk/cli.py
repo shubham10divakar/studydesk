@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from studydesk import __version__, lookup
-from studydesk.store import Conflict, Store, default_dir
+from studydesk.store import MAX_IMAGE, Conflict, Store, default_dir
 
 DEFAULT_PORT = 5173
 AUTHOR = "Subham Divakar"
@@ -149,6 +149,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
             return
+        if len(parts) == 2 and parts[0] == "image":
+            try:
+                found = store.read_image(parts[1])
+            except KeyError:
+                return self._json(400, {"error": "bad id"})
+            if found is None:
+                return self._json(404, {"error": "no such image"})
+            data, ctype = found
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(data)
+            return
         self._json(404, {"error": "not found"})
 
     def do_HEAD(self) -> None:
@@ -198,15 +213,28 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except ValueError:
                 return self._json(400, {"error": "upload ended early"})
             return self._json(200, {"ok": True})
+        if parts and len(parts) == 2 and parts[0] == "image":
+            n = self._length(MAX_IMAGE)
+            if n is None:
+                return
+            ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            try:
+                store.write_image(parts[1], self.rfile.read(n), ctype)
+            except KeyError:
+                return self._json(400, {"error": "bad id"})
+            except ValueError as e:
+                return self._json(415, {"error": str(e)})
+            return self._json(200, {"ok": True})
         self._json(404, {"error": "not found"})
 
     def do_DELETE(self) -> None:
         if not self._allowed():
             return
         parts = self._api_path()
-        if parts and len(parts) == 2 and parts[0] == "pdf":
+        if parts and len(parts) == 2 and parts[0] in ("pdf", "image"):
             try:
-                self.server.store.delete_pdf(parts[1])  # type: ignore[attr-defined]
+                store = self.server.store  # type: ignore[attr-defined]
+                (store.delete_pdf if parts[0] == "pdf" else store.delete_image)(parts[1])
             except KeyError:
                 return self._json(400, {"error": "bad id"})
             return self._json(200, {"ok": True})

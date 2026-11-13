@@ -158,6 +158,36 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(self.req("PUT", "/api/tracker", {"baseRev": "0", "tracker": {}}, {"Origin": "https://evil.example"})[0], 403)
         self.assertFalse((self.store.root / "tracker.json").exists())
 
+    def test_image_roundtrip(self):
+        png = b"\x89PNG\r\n\x1a\n" + bytes(range(256)) * 10
+        jpg = b"\xff\xd8\xff\xe0" + b"x" * 500
+        self.assertEqual(self.req("PUT", "/api/image/img01", png, {"Content-Type": "image/png"})[0], 200)
+        self.assertEqual((self.store.root / "images" / "img01.png").read_bytes(), png)
+        self.assertEqual(self.req("GET", "/api/image/img01"), (200, png))
+        # replacing it with another type leaves one file
+        self.assertEqual(self.req("PUT", "/api/image/img01", jpg, {"Content-Type": "image/jpeg"})[0], 200)
+        self.assertEqual(sorted(p.name for p in (self.store.root / "images").iterdir()), ["img01.jpg"])
+        c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        c.request("GET", "/api/image/img01", headers={"Host": f"localhost:{self.port}"})
+        r = c.getresponse()
+        r.read()
+        c.close()
+        self.assertEqual((r.getheader("Content-Type"), r.getheader("X-Content-Type-Options")), ("image/jpeg", "nosniff"))
+        self.assertEqual(self.req("DELETE", "/api/image/img01")[0], 200)
+        self.assertEqual(self.req("GET", "/api/image/img01")[0], 404)
+
+    def test_only_real_images(self):
+        html = b"<html><script>alert(1)</script></html>"
+        self.assertEqual(self.req("PUT", "/api/image/x1", html, {"Content-Type": "image/png"})[0], 415)        # says PNG, isn't
+        self.assertEqual(self.req("PUT", "/api/image/x1", html, {"Content-Type": "text/html"})[0], 415)
+        self.assertEqual(self.req("PUT", "/api/image/x1", b"<svg/>", {"Content-Type": "image/svg+xml"})[0], 415)  # SVG can carry script
+        self.assertIn(self.req("PUT", "/api/image/..%2Fx", b"\x89PNG\r\n\x1a\n", {"Content-Type": "image/png"})[0], (400, 404))
+        # an upload declared bigger than 10 MB is refused before it's read
+        self.assertEqual(self.req("PUT", "/api/image/x1", b"\x89PNG\r\n\x1a\n", {"Content-Type": "image/png", "Content-Length": str((10 << 20) + 1)})[0], 413)
+        self.assertEqual(self.req("PUT", "/api/image/x1", b"\x89PNG\r\n\x1a\n", {"Content-Type": "image/png", "Origin": "https://evil.example"})[0], 403)
+        imgs = self.store.root / "images"
+        self.assertFalse(imgs.exists() and any(imgs.iterdir()), "nothing was stored")
+
     def test_two_processes_share_a_folder(self):
         # a second Store on the same folder (another studydesk on another port) sees the first one's writes
         other = Store(self.store.root)

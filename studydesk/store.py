@@ -24,6 +24,18 @@ FORMAT_VERSION = 1
 TRACKER_FORMAT = "studydesk-tracker"
 TRACKER_FORMAT_VERSION = 1
 TRACKER_KEYS = ("lists", "submissions", "projects", "myPapers")
+# Images on tracker entries: only these types, and the file must start the way its type says.
+IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif"}
+MAX_IMAGE = 10 << 20
+
+
+def image_type_ok(ctype: str, head: bytes) -> bool:
+    return {
+        "image/png": head.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/jpeg": head.startswith(b"\xff\xd8\xff"),
+        "image/webp": head[:4] == b"RIFF" and head[8:12] == b"WEBP",
+        "image/gif": head[:6] in (b"GIF87a", b"GIF89a"),
+    }.get(ctype, False)
 KEEP_BACKUPS = 14
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 CHUNK = 1 << 20
@@ -86,6 +98,7 @@ class Store:
         self.tracker = self.root / "tracker.json"
         self.pdfs = self.root / "pdfs"
         self.backups = self.root / "backups"
+        self.images = self.root / "images"
         self.lock = threading.Lock()
         self.pdfs.mkdir(parents=True, exist_ok=True)
         self.backups.mkdir(exist_ok=True)
@@ -224,6 +237,48 @@ class Store:
             except OSError:
                 pass
             raise
+
+    # ---------- images (tracker entries) ----------
+    def _image_files(self, iid: str) -> list[Path]:
+        if not ID_RE.match(iid):
+            raise KeyError(iid)
+        return [self.images / f"{iid}{ext}" for ext in IMAGE_TYPES.values()]
+
+    def read_image(self, iid: str) -> tuple[bytes, str] | None:
+        files = self._image_files(iid)
+        with self.lock:
+            for path, ctype in zip(files, IMAGE_TYPES):
+                try:
+                    return path.read_bytes(), ctype
+                except FileNotFoundError:
+                    continue
+        return None
+
+    def write_image(self, iid: str, data: bytes, ctype: str) -> None:
+        files = self._image_files(iid)
+        if ctype not in IMAGE_TYPES or not image_type_ok(ctype, data[:16]):
+            raise ValueError("not a PNG, JPEG, WebP or GIF image")
+        if len(data) > MAX_IMAGE:
+            raise ValueError("image too large")
+        self.images.mkdir(exist_ok=True)
+        target = self.images / f"{iid}{IMAGE_TYPES[ctype]}"
+        with self.lock:
+            _atomic_write(target, [data])
+            for other in files:
+                if other != target:
+                    try:
+                        other.unlink()
+                    except FileNotFoundError:
+                        pass
+
+    def delete_image(self, iid: str) -> None:
+        files = self._image_files(iid)
+        with self.lock:
+            for path in files:
+                try:
+                    path.unlink()
+                except FileNotFoundError:
+                    pass
 
     def delete_pdf(self, pid: str) -> None:
         path = self.pdf_path(pid)

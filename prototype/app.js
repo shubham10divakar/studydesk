@@ -484,7 +484,7 @@ function libHTML(){
 function renderMain(){
   const m = $("#main"); m.classList.remove("is-reader");
   m.innerHTML = S.ui.view === "library" ? libHTML() : S.ui.view === "about" ? aboutHTML() : S.ui.view === "subs" ? subsHTML() : S.ui.view === "projects" ? projsHTML() : S.ui.view === "project" ? projectHTML() : S.ui.view === "mypapers" ? myPapersHTML() : S.ui.view === "upcoming" ? upcomingHTML() : homeHTML();
-  m.scrollTop = 0;
+  m.scrollTop = 0; hydrateImages(m);
 }
 function renderAll(){ renderSide(); if (S.ui.view === "reader" && R) renderPanel(); else renderMain(); applyLayout(); }
 
@@ -568,7 +568,8 @@ const FEATURES = [
     "Conferences add abstract, notification and camera-ready dates, dates and place",
     "Your own lists, each in priority order: drag an entry by its number, or use the arrows or Alt+↑ / Alt+↓",
     "All submissions shows every list by nearest deadline; filter by kind, Scopus, status, topic or free to publish now",
-    "Mark as submitted in one click; status runs from Considering to Accepted or Rejected"]],
+    "Mark as submitted in one click; status runs from Considering to Accepted or Rejected",
+    "Add an image to an entry, such as the call's flyer: choose a file or paste a screenshot"]],
   ["My papers", [
     "Your own manuscripts with status, target date, project, notes and an optional draft PDF",
     "Pick a 1st, 2nd and 3rd choice paper for each submission; each paper lists where it's aimed",
@@ -585,7 +586,8 @@ const FEATURES = [
     "GitHub repository shown as owner/name, plus any other links: docs, demo, PyPI, Overleaf, dataset",
     "Version, start and target dates, tags, people and Markdown notes",
     "Active projects with no update in 14 days are marked, and a filter finds them",
-    "A project lists the papers it produces and the library papers you read for it"]],
+    "A project lists the papers it produces and the library papers you read for it",
+    "An optional image per project, such as a logo or a diagram"]],
   ["Export and import", [
     "Export the whole library as one .zip: PDFs, highlights, notes, sessions, plus a readable Markdown file per paper with its link and abstract",
     "A small backup without PDFs for frequent saves",
@@ -1256,6 +1258,7 @@ function showImportDialog(step){
 function closeModal(){
   const m = $("#modal"); m.hidden = true; m.innerHTML = ""; IMP = null;
   if (LINK && LINK.hasFile && !LINK.saved) idb.del(LINK.id);   // Add by link looked up an arXiv PDF, then was cancelled
+  [SUBF, PF].forEach(F => { if (F && F.img && F.img.url) URL.revokeObjectURL(F.img.url); });
   LINK = null; SUBF = null; LISTF = null; PF = null; MF = null;
 }
 
@@ -1811,8 +1814,8 @@ function subRow(x, rank, showList, moves){
   const meta = [x.url && SAFE_LINK.test(x.url) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener" title="Open the call in a new tab">${esc(linkHost(x.url))} ↗</a>` : "",
     fmtMoney(x.apc) ? `<span>${esc(fmtMoney(x.apc))}</span>` : "", zeroTxt, confTxt, showList && l ? `<span>in ${esc(l.name)}</span>` : ""].filter(Boolean);
   const sentTxt = x.submitted && isDate(x.submitted.date) ? `<span class="tk-sent">Submitted ${fmtDate(dayAt(x.submitted.date))}</span>` : "";
-  return `<div class="tk-row${rank ? "" : " no-rank"}" data-id="${x.id}">
-    ${rank ? rankCell(x, rank, moves) : ""}
+  return `<div class="tk-row${rank ? "" : " no-rank"}${hasImg(x) ? " has-img" : ""}" data-id="${x.id}">
+    ${rank ? rankCell(x, rank, moves) : ""}${imgThumb(x)}
     <div class="tk-body">
       <div class="tk-top"><span class="tk-kind">${labelOf(SUB_KINDS, x.kind)}</span>${x.indexing === "scopus" ? '<span class="tk-badge">Scopus</span>' : x.indexing === "none" ? '<span class="tk-badge off">Not Scopus</span>' : ""}</div>
       <button class="tk-t" data-act="sub-edit" data-v="${x.id}">${esc(x.title || linkHost(x.url) || "Untitled")}</button>
@@ -1850,7 +1853,7 @@ function tkStep(id, dir, focusSel){ // focusSel: what to focus in the moved row 
   const b = document.querySelector(`.tk-row[data-id="${id}"] ${focusSel}`);
   (b && !b.disabled ? b : document.querySelector(`.tk-row[data-id="${id}"] .tk-t`))?.focus();
 }
-function rerenderKeep(){ const m = $("#main"), y = m.scrollTop; renderSide(); renderMain(); m.scrollTop = y; }
+function rerenderKeep(){ const m = $("#main"), y = m.scrollTop; renderSide(); renderMain(); m.scrollTop = y; }   // renderMain loads the images
 
 // Filters for the submission views; kept per browser in S.ui.tkF and shared by every list.
 const TKF0 = {kind:"", idx:"", st:"", topic:"", free:false, paper:""};
@@ -1908,7 +1911,7 @@ let SUBF = null; // the open submission form: {id, isNew, kind, indexing, topics
 function showSubForm(id, listId){
   const x = id ? getSub(id) : null; if (id && !x) return;
   const lists = tkLists("submissions");
-  SUBF = {id:x ? x.id : uid(), isNew:!x, kind:x?.kind || "journal", indexing:x?.indexing || "unknown", topics:[...(x?.topics || [])]};
+  SUBF = {id:x ? x.id : uid(), isNew:!x, kind:x?.kind || "journal", indexing:x?.indexing || "unknown", topics:[...(x?.topics || [])], img:{cur:hasImg(x) ? x.image : null, file:null, removed:false}};
   const d = x?.deadline || {}, c = x?.conf || {}, apc = x?.apc || {}, st = x?.status || "considering";
   const inList = x ? x.list : listId && getList(listId) ? listId : S.ui.view === "subs" && getList(S.ui.tkList) ? S.ui.tkList : lists[0]?.id || "";
   const val = s => `value="${esc(s ?? "")}"`;
@@ -1942,15 +1945,16 @@ function showSubForm(id, listId){
       <label class="lbl" for="sfList">List<select class="in" id="sfList">${lists.length ? lists.map(l => `<option value="${l.id}"${l.id === inList ? " selected" : ""}>${esc(l.name)}</option>`).join("") : `<option value="">Where to submit (a new list)</option>`}</select></label></div>
     <div class="two" id="sfSubWrap"${SENT.has(st) ? "" : " hidden"}><label class="lbl" for="sfSubOn">Submitted on<input class="in" id="sfSubOn" type="date" ${val(x?.submitted?.date)}></label>
       ${TK.myPapers.length ? `<label class="lbl" for="sfSubPaper">Paper submitted<select class="in" id="sfSubPaper"><option value="">Not recorded</option>${mpOpts(x?.submitted?.paper)}</select></label>` : ""}</div>
+    <div class="lbl">Image, optional<div class="img-ed" id="xfImg">${imgEditorHTML(SUBF)}</div></div>
     <label class="lbl" for="sfDetails">Details<textarea class="in" id="sfDetails" rows="4" placeholder="Scope, page limit, review time, who to contact. Markdown works.">${esc(x?.details || "")}</textarea></label>
     <p class="hint" id="sfMsg" role="status"></p>
     <div class="mdl-foot" id="sfFoot">${sfFoot(!!x)}</div>
   </div>`;
-  m.hidden = false; SUBF.init = subSnap(); $(x ? "#sfTitle" : "#sfUrl").focus();
+  m.hidden = false; hydrateImages(m); SUBF.init = subSnap(); $(x ? "#sfTitle" : "#sfUrl").focus();
 }
 const mpOpts = sel => TK.myPapers.map(m => `<option value="${m.id}"${m.id === sel ? " selected" : ""}>${esc(m.title)}</option>`).join("");
 const sfFoot = editing => `${editing ? `<button class="btn ghost danger tk-del" data-act="sub-del">Delete</button>` : ""}<button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="sub-save">${editing ? "Save" : "Add submission"}</button>`;
-const subSnap = () => JSON.stringify([SUBF.kind, SUBF.indexing, SUBF.topics, [...document.querySelectorAll("#sfForm input.in:not(.tag-in), #sfForm select, #sfForm textarea")].map(i => i.value), [...document.querySelectorAll("#sfForm input[type=checkbox]")].map(i => i.checked)]);
+const subSnap = () => JSON.stringify([SUBF.kind, SUBF.indexing, SUBF.topics, imgSnap(SUBF), [...document.querySelectorAll("#sfForm input.in:not(.tag-in), #sfForm select, #sfForm textarea")].map(i => i.value), [...document.querySelectorAll("#sfForm input[type=checkbox]")].map(i => i.checked)]);
 const subDirty = () => !!(SUBF && $("#sfForm") && subSnap() !== SUBF.init);
 function sfSeg(act, v){
   SUBF[act === "sf-kind" ? "kind" : "indexing"] = v;
@@ -1965,13 +1969,15 @@ function sfChanged(t){
   }
   if (t.id === "sfFree"){ $("#sfApc").disabled = $("#sfCur").disabled = t.checked; }
 }
-function subSave(){
+async function subSave(){
   const v = id => ($("#" + id)?.value || "").trim(), msg = $("#sfMsg"), url = v("sfUrl");
   if (!SAFE_LINK.test(url)){ msg.textContent = "Paste the link to the call or venue, starting with https://"; $("#sfUrl").focus(); return; }
   const amt = v("sfApc").replace(/[,\s]/g, "");
   if (!$("#sfFree").checked && amt && !Number.isFinite(+amt)){ msg.textContent = "Write the APC as a number, like 1800."; $("#sfApc").focus(); return; }
   const tagIn = $("#tagIn-sub"); if (tagIn && normTag(tagIn.value)) addTag("sub", tagIn.value);   // a topic typed but not yet added
-  const old = getSub(SUBF.id), was = old ? old.list : null, st = v("sfStatus");
+  const old = getSub(SUBF.id), was = old ? old.list : null, st = v("sfStatus"), F = SUBF;
+  let image; try { image = await saveFormImage(F, old); } catch(e){ msg.textContent = `Couldn't save the image: ${e.message}. Try another, or remove it.`; return; }
+  if (SUBF !== F) return;   // the form was closed while the image was saving
   let l = getList(v("sfList")); if (!l) l = newList("submissions", "Where to submit");
   const x = Object.assign(old || {id:SUBF.id, addedAt:Date.now()}, {
     list:l.id, kind:SUBF.kind, title:v("sfTitle") || linkHost(url), url, topics:SUBF.topics.slice(), indexing:SUBF.indexing,
@@ -1981,7 +1987,7 @@ function subSave(){
     conf:SUBF.kind === "conference" ? {abstract:v("sfAbs"), notification:v("sfNotif"), cameraReady:v("sfCam"), from:v("sfFrom"), to:v("sfTo"), place:v("sfPlace")} : (old?.conf || null),
     targets:$("#sfT0") ? [0, 1, 2].map(i => v("sfT" + i) || null) : (old?.targets || [null, null, null]),
     status:st, submitted:SENT.has(st) ? {date:v("sfSubOn") || isoDay(Date.now()), paper:$("#sfSubPaper") ? v("sfSubPaper") || null : old?.submitted?.paper ?? null} : null,
-    details:$("#sfDetails").value.trim(), updatedAt:Date.now()});
+    details:$("#sfDetails").value.trim(), image, updatedAt:Date.now()});
   if (was && was !== l.id){ const pl = getList(was); if (pl) pl.order = (pl.order || []).filter(i => i !== x.id); }
   if (!(l.order || (l.order = [])).includes(x.id)) l.order.push(x.id);
   if (!old) TK.submissions.push(x);
@@ -1993,7 +1999,7 @@ function subSave(){
 }
 function subDelete(){
   const x = getSub(SUBF && SUBF.id); if (!x) return closeModal();
-  TK.submissions = TK.submissions.filter(y => y.id !== x.id);
+  TK.submissions = TK.submissions.filter(y => y.id !== x.id); if (hasImg(x)) images.del(x.image.id);
   const l = getList(x.list); if (l) l.order = (l.order || []).filter(i => i !== x.id);
   tsave(); SUBF = null; closeModal(); renderAll(); toast(`Deleted “${x.title}”`);
 }
@@ -2037,6 +2043,7 @@ function showListDelete(id){
 function listDelete(id){
   const l = getList(id); if (!l) return closeModal();
   const coll = l.section === "projects" ? "projects" : "submissions", n = TK[coll].filter(x => x.list === l.id).length;
+  TK[coll].forEach(x => { if (x.list === l.id && hasImg(x)) images.del(x.image.id); });
   TK[coll] = TK[coll].filter(x => x.list !== l.id); TK.lists = TK.lists.filter(x => x.id !== l.id);
   tsave(); closeModal(); S.ui.tkList = "all"; save(); renderAll();
   toast(`Deleted the list “${l.name}”${n ? ` and its ${n} ${n === 1 ? "entry" : "entries"}` : ""}`);
@@ -2072,8 +2079,8 @@ function projRow(p, rank, showList, moves){
   const msTxt = ms ? (() => { const t = dayAt(ms.due), d = daysTo(t); return `<span class="${d < 0 ? "over" : d <= 7 ? "warn" : ""}">Milestone: ${esc(ms.title)}, ${d < 0 ? `${-d} days overdue` : d === 0 ? "due today" : `due ${fmtDate(t)}`}</span>`; })() : "";
   const nmp = TK.myPapers.filter(m => m.project === p.id).length;
   const meta = [projLinks(p, "tk-lk"), nmp ? `<span>${nmp} of my papers</span>` : "", p.version ? `<span class="num">v${esc(p.version.replace(/^v/i, ""))}</span>` : "", msTxt, showList && l ? `<span>in ${esc(l.name)}</span>` : ""].filter(Boolean);
-  return `<div class="tk-row${rank ? "" : " no-rank"}" data-id="${p.id}">
-    ${rank ? rankCell(p, rank, moves) : ""}
+  return `<div class="tk-row${rank ? "" : " no-rank"}${hasImg(p) ? " has-img" : ""}" data-id="${p.id}">
+    ${rank ? rankCell(p, rank, moves) : ""}${imgThumb(p)}
     <div class="tk-body">
       <div class="tk-top"><span class="tk-kind">${labelOf(PROJ_KINDS, p.kind)}</span>${projPill(p.status)}${isStale(p) ? `<span class="tk-stale" title="Active, but nothing logged for ${st} days">No update in ${st} days</span>` : ""}</div>
       <button class="tk-t" data-act="proj-open" data-v="${p.id}">${esc(p.name || "Untitled project")}</button>
@@ -2130,6 +2137,7 @@ function projectHTML(){
         ${ups ? `<ul class="pu-list">${ups}</ul>` : `<div class="empty">Log what happened as you go, one line at a time. The newest line shows on the project's card, so you can see where everything stands at a glance.</div>`}
       </section>
       <div class="pj-side">
+        ${hasImg(p) ? `<button class="pj-img" data-act="img-view" data-v="${esc(p.image.id)}" aria-label="View the project's image"><img data-img="${esc(p.image.id)}" alt=""></button>` : ""}
         <section class="card" aria-labelledby="pn-h"><h3 id="pn-h">Next step</h3>
           <div class="pn"><label class="vh" for="pnText">Next step</label><input class="in" id="pnText" autocomplete="off" placeholder="The one thing to do next" value="${esc(p.next?.text || "")}">
           <label class="vh" for="pnDue">Due</label><input class="in" id="pnDue" type="date" value="${esc(p.next?.due || "")}"><button class="btn sm" data-act="pn-save">Save</button></div></section>
@@ -2160,7 +2168,7 @@ let PF = null; // the open project form: {id, kind, tags, init}
 function showProjForm(id, listId){
   const p = id ? getProj(id) : null; if (id && !p) return;
   const lists = tkLists("projects");
-  PF = {id:p ? p.id : uid(), kind:p?.kind || "research", tags:[...(p?.tags || [])]};
+  PF = {id:p ? p.id : uid(), kind:p?.kind || "research", tags:[...(p?.tags || [])], img:{cur:hasImg(p) ? p.image : null, file:null, removed:false}};
   const inList = p ? p.list : listId && getList(listId) ? listId : S.ui.view === "projects" && getList(S.ui.tkList) ? S.ui.tkList : lists[0]?.id || "";
   const val = s => `value="${esc(s ?? "")}"`;
   const m = $("#modal");
@@ -2178,17 +2186,18 @@ function showProjForm(id, listId){
     <div class="lbl">Tags${tagEditor(PF.tags, "proj")}</div>
     <label class="lbl" for="pfPeople">People, optional<input class="in" id="pfPeople" autocomplete="off" placeholder="Collaborators, supervisor" ${val(p?.people)}></label>
     <label class="lbl" for="pfList">List<select class="in" id="pfList">${lists.length ? lists.map(l => `<option value="${l.id}"${l.id === inList ? " selected" : ""}>${esc(l.name)}</option>`).join("") : `<option value="">My projects (a new list)</option>`}</select></label>
+    <div class="lbl">Image, optional<div class="img-ed" id="xfImg">${imgEditorHTML(PF)}</div></div>
     <label class="lbl" for="pfNotes">Notes<textarea class="in" id="pfNotes" rows="4" placeholder="Goals, decisions, anything to remember. Markdown works.">${esc(p?.notes || "")}</textarea></label>
     <p class="hint" id="pfMsg" role="status"></p>
     <div class="mdl-foot" id="pfFoot">${pfFoot(!!p)}</div>
   </div>`;
-  m.hidden = false; PF.init = projSnap(); $("#pfName").focus();
+  m.hidden = false; hydrateImages(m); PF.init = projSnap(); $("#pfName").focus();
 }
 const linkRowHTML = l => `<div class="pf-link"><label class="vh">Label</label><input class="in" data-pl="label" autocomplete="off" placeholder="Label, e.g. PyPI" value="${esc(l?.label || "")}"><label class="vh">Link</label><input class="in" data-pl="url" type="url" autocomplete="off" spellcheck="false" placeholder="https://…" value="${esc(l?.url || "")}"><button type="button" class="pu-x" data-act="pl-del" aria-label="Remove this link">×</button></div>`;
 const pfFoot = editing => `${editing ? `<button class="btn ghost danger tk-del" data-act="proj-del">Delete</button>` : ""}<button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="proj-save">${editing ? "Save" : "Add project"}</button>`;
-const projSnap = () => JSON.stringify([PF.kind, PF.tags, [...document.querySelectorAll("#pfForm input.in:not(.tag-in), #pfForm select, #pfForm textarea")].map(i => i.value)]);
+const projSnap = () => JSON.stringify([PF.kind, PF.tags, imgSnap(PF), [...document.querySelectorAll("#pfForm input.in:not(.tag-in), #pfForm select, #pfForm textarea")].map(i => i.value)]);
 const projDirty = () => !!(PF && $("#pfForm") && projSnap() !== PF.init);
-function projSave(){
+async function projSave(){
   const v = id => ($("#" + id)?.value || "").trim(), msg = $("#pfMsg"), name = v("pfName"), git = v("pfGit");
   if (!name){ msg.textContent = "Give the project a name."; $("#pfName").focus(); return; }
   if (git && !SAFE_LINK.test(git)){ msg.textContent = "The repository link should start with https://"; $("#pfGit").focus(); return; }
@@ -2196,11 +2205,13 @@ function projSave(){
   const bad = links.find(l => !SAFE_LINK.test(l.url));
   if (bad){ msg.textContent = `The link${bad.label ? ` “${bad.label}”` : ""} should start with https://`; return; }
   const tagIn = $("#tagIn-proj"); if (tagIn && normTag(tagIn.value)) addTag("proj", tagIn.value);
-  const old = getProj(PF.id), was = old ? old.list : null, st = v("pfStatus");
+  const old = getProj(PF.id), was = old ? old.list : null, st = v("pfStatus"), F = PF;
+  let image; try { image = await saveFormImage(F, old); } catch(e){ msg.textContent = `Couldn't save the image: ${e.message}. Try another, or remove it.`; return; }
+  if (PF !== F) return;
   let l = getList(v("pfList")); if (!l) l = newList("projects", "My projects");
-  const p = Object.assign(old || {id:PF.id, addedAt:Date.now(), updates:[], milestones:[], next:null, papers:[], myPapers:[], image:null}, {
+  const p = Object.assign(old || {id:PF.id, addedAt:Date.now(), updates:[], milestones:[], next:null, papers:[], myPapers:[]}, {
     list:l.id, name, summary:v("pfSum"), kind:PF.kind, version:v("pfVer"), github:git, links,
-    started:v("pfStart"), targetDate:v("pfTarget"), tags:PF.tags.slice(), people:v("pfPeople"), notes:$("#pfNotes").value.trim(), updatedAt:Date.now()});
+    started:v("pfStart"), targetDate:v("pfTarget"), tags:PF.tags.slice(), people:v("pfPeople"), notes:$("#pfNotes").value.trim(), image, updatedAt:Date.now()});
   if (old && old.status !== st) (p.updates = p.updates || []).unshift({id:uid(), at:Date.now(), text:"", status:st});
   p.status = st;
   if (was && was !== l.id){ const pl = getList(was); if (pl) pl.order = (pl.order || []).filter(i => i !== p.id); }
@@ -2212,7 +2223,7 @@ function projSave(){
 }
 function projDelete(){
   const p = getProj(PF && PF.id); if (!p) return closeModal();
-  TK.projects = TK.projects.filter(y => y.id !== p.id);
+  TK.projects = TK.projects.filter(y => y.id !== p.id); if (hasImg(p)) images.del(p.image.id);
   const l = getList(p.list); if (l) l.order = (l.order || []).filter(i => i !== p.id);
   tsave(); PF = null; closeModal(); S.ui.view = "projects"; S.ui.tkList = l ? l.id : "all"; save(); renderAll(); toast(`Deleted “${p.name}”`);
 }
@@ -2381,6 +2392,69 @@ function homeTrackersHTML(){
     </div>`;
 }
 
+/* ---------------- images on tracker entries ---------------- */
+// One optional image per submission or project (a call's flyer, a screenshot, a logo). Under studydesk it's a file in
+// images/ through /api/image/<id>; in a browser it's in IndexedDB under "img:<id>". Each upload gets a new id, so a
+// replaced image never shows from cache, and the entry stores {id, type}.
+const IMG_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"], MAX_IMG = 10 << 20;
+const imgURLs = new Map();   // browser mode: image id -> object URL
+const images = {
+  put: async (id, blob) => {
+    if (!DISK.on) return bidb.putStrict("img:" + id, blob);
+    const r = await fetch(`api/image/${encodeURIComponent(id)}`, {method:"PUT", headers:{"Content-Type":blob.type}, body:blob});
+    if (!r.ok) throw new Error(((await r.json().catch(() => null)) || {}).error || `HTTP ${r.status}`);
+  },
+  get: async id => {
+    if (!DISK.on) return bidb.get("img:" + id);
+    try { const r = await fetch(`api/image/${encodeURIComponent(id)}`); return r.ok ? await r.blob() : null; } catch(e){ return null; }
+  },
+  del: id => {
+    const u = imgURLs.get(id); if (u){ URL.revokeObjectURL(u); imgURLs.delete(id); }
+    return DISK.on ? fetch(`api/image/${encodeURIComponent(id)}`, {method:"DELETE"}).catch(() => {}) : bidb.del("img:" + id);
+  },
+  url: async id => {
+    if (DISK.on) return `api/image/${encodeURIComponent(id)}`;
+    if (!imgURLs.has(id)){ const b = await bidb.get("img:" + id); if (!b) return ""; imgURLs.set(id, URL.createObjectURL(b)); }
+    return imgURLs.get(id);
+  },
+};
+async function hydrateImages(root){
+  for (const el of (root || document).querySelectorAll("img[data-img]:not([src])")){ const u = await images.url(el.dataset.img); if (u) el.src = u; else el.closest(".tk-thumb, .pj-img")?.remove(); }
+}
+const hasImg = x => !!(x && x.image && x.image.id);
+const imgThumb = x => hasImg(x) ? `<button class="tk-thumb" data-act="img-view" data-v="${esc(x.image.id)}" aria-label="View the image for ${esc(x.title || x.name || "this entry")}"><img data-img="${esc(x.image.id)}" alt=""></button>` : "";
+function showImage(id){
+  const m = $("#modal");
+  m.innerHTML = `<div class="mdl img-view" role="dialog" aria-modal="true" aria-label="Image"><img data-img="${esc(id)}" alt=""><div class="mdl-foot"><button class="btn primary" data-act="modal-close">Close</button></div></div>`;
+  m.hidden = false; hydrateImages(m); m.querySelector(".btn").focus();
+}
+// The image field in the submission and project forms. F is SUBF or PF; F.img = {cur, file, removed}.
+function imgEditorHTML(F){
+  const show = F.img.file ? "new" : F.img.cur && !F.img.removed ? "cur" : "";
+  return `${show ? `<span class="img-prev"><img ${show === "new" ? `src="${F.img.url}"` : `data-img="${esc(F.img.cur.id)}"`} alt="The image for this entry"></span>` : ""}
+    <span class="img-acts"><button type="button" class="btn sm" data-act="img-pick">${show ? "Replace image" : "Choose image"}</button>${show ? `<button type="button" class="btn sm ghost" data-act="img-rm">Remove</button>` : ""}<span class="hint">or paste a screenshot (Ctrl+V). PNG, JPEG, WebP or GIF, up to 10 MB.</span></span>
+    <input type="file" id="xfImgIn" accept="image/png,image/jpeg,image/webp,image/gif" hidden>`;
+}
+const formF = () => SUBF && $("#sfForm") ? SUBF : PF && $("#pfForm") ? PF : null;
+function renderImgEditor(){ const F = formF(), box = $("#xfImg"); if (!F || !box){ return; } box.innerHTML = imgEditorHTML(F); hydrateImages(box); }
+function setFormImage(file){
+  const F = formF(); if (!F || !file) return;
+  const msg = $("#sfMsg") || $("#pfMsg");
+  if (!IMG_TYPES.includes(file.type)){ msg.textContent = "That isn't a PNG, JPEG, WebP or GIF image."; return; }
+  if (file.size > MAX_IMG){ msg.textContent = "That image is over 10 MB. Use a smaller one."; return; }
+  if (F.img.url) URL.revokeObjectURL(F.img.url);
+  F.img.file = file; F.img.url = URL.createObjectURL(file); F.img.removed = false; msg.textContent = "";
+  renderImgEditor();
+}
+// Saves a new image first, then removes the one it replaces. Returns what the entry should store.
+async function saveFormImage(F, old){
+  const was = old && hasImg(old) ? old.image : null;
+  if (F.img.file){ const id = uid(); await images.put(id, F.img.file); if (was) images.del(was.id); return {id, type:F.img.file.type}; }
+  if (F.img.removed){ if (was) images.del(was.id); return null; }
+  return was;
+}
+const imgSnap = F => F && F.img ? (F.img.file ? "new:" + F.img.file.size : F.img.removed ? "removed" : "") : "";
+
 /* ---------------- tag picker ---------------- */
 // The tag box suggests tags already in the library: most used first when empty, matches (prefix first) as you type.
 // Enter or comma adds the selected suggestion, or the typed text as a new tag; Backspace in an empty box removes the last tag.
@@ -2546,6 +2620,9 @@ document.addEventListener("click", async e => {
     case "pn-save": { const pp = getProj(S.ui.tkItem); if (pp){ const tx = $("#pnText").value.trim(), du = $("#pnDue").value; pp.next = tx ? {text:tx, due:du} : null; projTouch(pp); toast(tx ? "Next step saved" : "Next step cleared"); } break; }
     case "pm-add": { const pp = getProj(S.ui.tkItem), tx = $("#pmTitle").value.trim(); if (!pp) break; if (!tx){ $("#pmTitle").focus(); break; } (pp.milestones = pp.milestones || []).push({id:uid(), title:tx, due:$("#pmDue").value, done:false}); projTouch(pp); $("#pmTitle")?.focus(); break; }
     case "pm-del": { const pp = getProj(S.ui.tkItem); if (pp){ pp.milestones = (pp.milestones || []).filter(m => m.id !== v); projTouch(pp); } break; }
+    case "img-view": showImage(v); break;
+    case "img-pick": $("#xfImgIn")?.click(); break;
+    case "img-rm": { const F = formF(); if (F){ if (F.img.url) URL.revokeObjectURL(F.img.url); F.img.file = null; F.img.url = ""; F.img.removed = true; renderImgEditor(); } break; }
     case "upcoming": closeReader(); S.ui.view = "upcoming"; save(); renderAll(); break;
     case "mypapers": closeReader(); S.ui.view = "mypapers"; save(); renderAll(); break;
     case "mp-new": showMPForm(null, v); break;
@@ -2618,6 +2695,12 @@ document.addEventListener("scroll", e => { if (e.target && e.target.id === "page
 let rzT; window.addEventListener("resize", () => { clearTimeout(rzT); rzT = setTimeout(() => { if (R && $("#pages .page")) buildPages(); }, 250); });
 
 $("#fileIn").addEventListener("change", e => { importFiles(e.target.files); e.target.value = ""; });
+document.addEventListener("change", e => { if (e.target.id === "xfImgIn"){ setFormImage(e.target.files[0]); e.target.value = ""; } });
+document.addEventListener("paste", e => {   // a screenshot pasted into a submission or project form becomes its image
+  if (!formF()) return;
+  const f = [...(e.clipboardData?.files || [])].find(x => x.type.startsWith("image/")); if (!f) return;
+  e.preventDefault(); setFormImage(f);
+});
 $("#impIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) startImport(f); });
 const formDirty = () => linkDirty() || subDirty() || projDirty() || mpDirty();
 $("#modal").addEventListener("click", e => { if (e.target.id === "modal" && !formDirty()) closeModal(); });
