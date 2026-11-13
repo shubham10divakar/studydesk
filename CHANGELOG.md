@@ -1,6 +1,11 @@
 # Changelog
 
-All notable changes to PDFDesk. Versions follow [semantic versioning](https://semver.org/); dates are release dates.
+All notable changes to StudyDesk (called PDFDesk up to 1.1.1). Versions follow [semantic versioning](https://semver.org/); dates are release dates.
+
+## 1.2.0 (2026-11-13)
+
+- **PDFDesk is now StudyDesk.** Install with `pip install studydesk` and start it with `studydesk`. The repo moved to https://github.com/shubham10divakar/studydesk.
+- **Your library comes with you.** If there's no `~/StudyDesk` folder yet, StudyDesk uses your `~/PDFDesk` folder as it is (and `PDFDESK_DATA` still works). Browser libraries, UI settings and export files from PDFDesk all keep working; exports are now named `studydesk-export-….zip`.
 
 ## 1.1.1 (2026-11-13)
 

@@ -7,7 +7,7 @@ Browser app in `prototype/`. Library, lifecycle, PDF reader, highlights, notes w
 Small changes, no build step.
 
 Done:
-- [x] **Library on disk under `pdfdesk`** (0.2.0): `~/PDFDesk/` with library.json, real PDF files and daily backups, so any port or browser shows the same library and clearing browser data deletes nothing. Browser libraries move in automatically. Spec: [disk-storage.md](disk-storage.md), decision D-010
+- [x] **Library on disk under `studydesk`** (0.2.0): `~/StudyDesk/` with library.json, real PDF files and daily backups, so any port or browser shows the same library and clearing browser data deletes nothing. Browser libraries move in automatically. Spec: [disk-storage.md](disk-storage.md), decision D-010
 - [x] **Export / import** the whole library as one `.zip` (library.json, PDFs, readable Markdown notes); import merges without deleting. Spec: [export-import.md](export-import.md)
 - [x] **Vendor PDF.js and fonts** so the app works offline (D-009)
 - [x] **Zoomed pages scroll to both edges** (0.2.2)
@@ -17,9 +17,9 @@ Done:
 - [x] **Contents tab** from the PDF's outline: jump to a section (with Back), the current section is marked
 - [x] **Session edit/delete** for sessions logged by mistake
 - [x] **Search** across notes, highlights and session takeaways from the sidebar; each result opens the right page, highlight or note line
-- [x] **Add by arXiv ID or DOI**: details from arXiv / Crossref, arXiv PDFs downloaded into the library folder (needs `pdfdesk`; D-011)
+- [x] **Add by arXiv ID or DOI**: details from arXiv / Crossref, arXiv PDFs downloaded into the library folder (needs `studydesk`; D-011)
 - [x] **Highlight re-anchoring**: highlights keep the text around them; replacing a PDF finds each one again by its text (also when slightly reworded), and any that can't be found are kept and marked
-- [x] **Add by link, without the PDF**: link, details (BibTeX from Google Scholar fills them), abstract, tags and notes; a paper page instead of pages, no sessions; attach the PDF later. arXiv/DOI links can be filled in under `pdfdesk`
+- [x] **Add by link, without the PDF**: link, details (BibTeX from Google Scholar fills them), abstract, tags and notes; a paper page instead of pages, no sessions; attach the PDF later. arXiv/DOI links can be filled in under `studydesk`
 - [x] **Tag suggestions**: the tag box lists existing tags (most used first, narrowed as you type); keys and mouse; Details and Add by link
 - [x] **Abstract** field for every paper, searched by the library search
 
@@ -30,16 +30,19 @@ Still open:
 - [ ] **"Last export" date** kept in the library folder rather than per browser
 - [ ] Search inside the PDFs' own text (Phase 2 does this with FTS5; in the prototype it would mean indexing every page on import)
 
-## Distribution: pip (`pdfdesk`)
+## Distribution: pip (`studydesk`)
 See decisions.md D-008. One package name and one command across both stacks.
+
+Up to 1.1.1 the package was `pdfdesk`; from 1.2.0 it is `studydesk` (D-013).
 
 - [x] **0.1.0**: wheel bundles `prototype/` + stdlib server; `pdfdesk` opens it at http://localhost:5173
 - [x] **0.2.1**: export/import, library on disk, open the folder from the app (on PyPI; 0.1.1 and 0.2.0 were tagged but never published)
 - [x] **0.2.2**: zoom scrolling fix (on PyPI)
 - [x] **1.0.0**: first stable release; everything in CHANGELOG.md's 1.0.0 entry (on PyPI)
 - [x] **1.1.0**: add by link without the PDF, tag suggestions, abstracts (on PyPI)
-- [x] **1.1.1**: last `pdfdesk` release. Ships the README/About wording from b0de801 and a notice that PDFDesk is now **StudyDesk** (`studydesk` on PyPI, https://github.com/shubham10divakar/studydesk). Development continues there; this repo is frozen.
-- [ ] **2.x**: platform wheels carrying the Tauri binary (Windows x64, macOS x64 + arm64, Linux x64), built in CI; `pdfdesk` launches the app. Consider pytauri if the backend should be Python
+- [x] **1.1.1**: last `pdfdesk` release. Ships the README/About wording from b0de801 and a notice that PDFDesk is now StudyDesk; github.com/shubham10divakar/pdfdesk is frozen there
+- [x] **1.2.0**: renamed to StudyDesk (`studydesk` on PyPI); an existing `~/PDFDesk` library is used as it is
+- [ ] **2.x**: platform wheels carrying the Tauri binary (Windows x64, macOS x64 + arm64, Linux x64), built in CI; `studydesk` launches the app. Consider pytauri if the backend should be Python
 - [ ] 2.x first run: offer to import a 1.x export file (or read the 1.x library folder directly)
 - [ ] Optional native installers (`.msi`, `.dmg`) alongside pip
 

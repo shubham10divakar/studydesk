@@ -1,4 +1,4 @@
-# PDFDesk: developer guide
+# StudyDesk: developer guide
 
 This is the working README for the code. The product page is [README.md](README.md), which is also the PyPI description, so keep it user-facing and use absolute image URLs there (`raw.githubusercontent.com/.../main/docs/assets/...`) or the images break on PyPI.
 
@@ -6,34 +6,34 @@ A local-first workspace for reading research papers. It treats each PDF as somet
 
 Think Zotero's library + a PDF reader + a notebook + a reading log, in one window.
 
-> **Status:** 1.0, a browser app (HTML/CSS/JS, no build step) served by a small Python command, `pdfdesk`, that keeps the library in a folder on disk. The next major version (2.x) is a Tauri + React + SQLite desktop app shipped through the same `pdfdesk` package. See [docs/roadmap.md](docs/roadmap.md).
+> **Status:** 1.0, a browser app (HTML/CSS/JS, no build step) served by a small Python command, `studydesk`, that keeps the library in a folder on disk. The next major version (2.x) is a Tauri + React + SQLite desktop app shipped through the same `studydesk` package. See [docs/roadmap.md](docs/roadmap.md).
 
 ## Install
 
 Requires Python 3.9+. No other dependencies.
 
 ```bash
-pip install pdfdesk          # or a local wheel: pip install dist/pdfdesk-1.0.0-py3-none-any.whl
-pdfdesk                      # starts PDFDesk and opens http://localhost:5173
-pdfdesk --no-browser         # just start the server
-pdfdesk --help
+pip install studydesk          # or a local wheel: pip install dist/studydesk-1.0.0-py3-none-any.whl
+studydesk                      # starts StudyDesk and opens http://localhost:5173
+studydesk --no-browser         # just start the server
+studydesk --help
 ```
 
 Your library is stored in the browser you open it in, for the address `localhost:5173`. Use the same browser and the default port, or it will look empty. Uninstalling the package does not delete your library.
 
 ## Develop
 
-Requires Node 18+ (or use `python -m pdfdesk` from the repo root).
+Requires Node 18+ (or use `python -m studydesk` from the repo root).
 
 ```bash
-npm run dev          # PDFDesk at http://localhost:5173, library in ~/PDFDesk-test (C:\Users\Subham\PDFDesk-test)
-npm run dev -- --port 5174   # same, on another port (e.g. while the installed pdfdesk has 5173)
+npm run dev          # StudyDesk at http://localhost:5173, library in ~/PDFDesk-test (C:\Users\Subham\PDFDesk-test)
+npm run dev -- --port 5174   # same, on another port (e.g. while the installed studydesk has 5173)
 npm run dev:static   # prototype/ on a plain static server: browser storage, no library folder
 npm run check        # syntax-check prototype/app.js
 npm test             # server + store unit tests
 ```
 
-Development always uses `~/PDFDesk-test` as the library folder, so test data never mixes with the real `~/PDFDesk`. Click the folder path in the sidebar or on the About page to open it in File Explorer.
+Development always uses `~/PDFDesk-test` as the library folder, so test data never mixes with the real `~/StudyDesk`. Click the folder path in the sidebar or on the About page to open it in File Explorer.
 
 No `npm install` needed. There are no dependencies. PDF.js and the fonts are vendored in `prototype/vendor/`, so it works offline.
 
@@ -41,10 +41,10 @@ Build the Python package with `python -m build` (outputs to `dist/`).
 
 ## Release
 
-1. Bump `__version__` in `pdfdesk/__init__.py` and `VERSION` near the top of `prototype/app.js` (shown on the About page).
-2. `python -m build` and test the wheel in a clean venv: `pip install dist/pdfdesk-<v>-py3-none-any.whl && pdfdesk`.
+1. Bump `__version__` in `studydesk/__init__.py` and `VERSION` near the top of `prototype/app.js` (shown on the About page).
+2. `python -m build` and test the wheel in a clean venv: `pip install dist/studydesk-<v>-py3-none-any.whl && studydesk`.
 3. `twine check dist/*` (renders the README the way PyPI will), then `twine upload dist/*`.
-4. Add the version to `CHANGELOG.md`, then tag the commit: `git tag -a v<v> -m "PDFDesk <v>" && git push origin v<v>`.
+4. Add the version to `CHANGELOG.md`, then tag the commit: `git tag -a v<v> -m "StudyDesk <v>" && git push origin v<v>`.
 
 The download badges in README.md are both drawn by shields.io (total from pepy.tech, monthly from pypistats.org). Those services read PyPI's public download data with about a day's delay, so a newly published package shows "not found" for a day or two, then fills in by itself. Use shields.io's `pepy/dt` badge rather than `static.pepy.tech/badge/...`: the latter answers 404 until indexed, which GitHub shows as a broken image.
 
@@ -55,7 +55,7 @@ python -m unittest discover -s tests     # library folder, HTTP API, arXiv/DOI l
 npm run check                            # syntax of app.js
 ```
 
-`scripts/e2e/disk-storage.mjs` checks the library on disk end to end (20 checks): it starts two `pdfdesk` processes sharing one folder plus the static server, and drives four isolated headless-Chrome profiles through first run, PDFs on disk, another port, two windows editing at once (including a real notes clash), the server stopping, and moving 0.1.x browser libraries in.
+`scripts/e2e/disk-storage.mjs` checks the library on disk end to end (20 checks): it starts two `studydesk` processes sharing one folder plus the static server, and drives four isolated headless-Chrome profiles through first run, PDFs on disk, another port, two windows editing at once (including a real notes clash), the server stopping, and moving 0.1.x browser libraries in.
 
 ```bash
 chrome --headless=new --remote-debugging-port=9337 --user-data-dir=<temp dir> about:blank
@@ -103,7 +103,7 @@ The images in `docs/assets/` come from `scripts/screenshots/`. It drives headles
 # 1. print the sample paper to PDF
 chrome --headless --no-pdf-header-footer --print-to-pdf=sample-paper.pdf scripts/screenshots/sample-paper.html
 # 2. start the app and a debuggable headless Chrome
-python -m pdfdesk --no-browser --port 5190
+python -m studydesk --no-browser --port 5190
 chrome --headless=new --hide-scrollbars --remote-debugging-port=9333 --user-data-dir=<temp dir> about:blank
 # 3. capture (absolute path to the PDF)
 node scripts/screenshots/shoot.mjs 9333 http://localhost:5190/ <abs path>/sample-paper.pdf docs/assets
@@ -123,7 +123,7 @@ Alternative without Node: `cd prototype && python -m http.server 5173`.
 | Highlights | Select text → 4 colours with meanings (yellow key idea, green method/result, blue definition, pink question). Optional comment per highlight. Click a card to see it on the page, or a highlight on the page to open its card. Re-found by text when the PDF is replaced |
 | Notes | Per-paper Markdown notes. `p. 12` becomes a link to that page. "Insert highlights" pulls highlights into notes with page refs. "Cite p. N" inserts the current page |
 | Sessions | Active reading time (pauses after 3 min idle or when the tab is hidden), page range covered, optional takeaway note. Auto-logged when you leave a paper. Edit or delete from the Sessions tab |
-| Library on disk | Under `pdfdesk`, a folder with library.json, real PDFs and daily backups; any port or browser shows the same library; two windows merge without losing edits; 0.1.x browser libraries move in |
+| Library on disk | Under `studydesk`, a folder with library.json, real PDFs and daily backups; any port or browser shows the same library; two windows merge without losing edits; 0.1.x browser libraries move in |
 | Export / import | One `.zip` with library.json, PDFs and Markdown notes; small `.json` backup without PDFs; import previews, then merges (never deletes) or replaces after a second confirmation; drop an export to import |
 | Overview | Stats, continue-reading list, 17-week reading heatmap with streak, up-next queue with target dates, daily revision queue of past highlights, reading log |
 
@@ -140,13 +140,13 @@ prototype/
 scripts/
   serve.mjs       zero-dependency static server (Node, for development)
   screenshots/    regenerate docs/assets/ (headless Chrome, see Screenshots)
-pdfdesk/
-  cli.py          the `pdfdesk` command: stdlib server, /api/ for the library, open browser
+studydesk/
+  cli.py          the `studydesk` command: stdlib server, /api/ for the library, open browser
   store.py        the library folder: library.json, pdfs/, backups (atomic writes, rev checks)
   lookup.py       arXiv / Crossref lookups for Add by arXiv ID or DOI (three fixed hosts)
 tests/            unittest suites: server + store, lookup (no network)
 scripts/e2e/      headless-Chrome end-to-end scripts, fixtures/ holds the HTML test papers
-pyproject.toml    package metadata; the wheel bundles prototype/ as pdfdesk/static/
+pyproject.toml    package metadata; the wheel bundles prototype/ as studydesk/static/
 docs/
   assets/         screenshots used by README.md
   vision.md       what we're building and why
@@ -164,7 +164,7 @@ reference/        how v0.1 was made: original idea notes, design skill, single-f
 
 ## Where data is stored
 
-- **Under `pdfdesk`:** the library folder (`~/PDFDesk`, or `--data-dir`, or `$PDFDESK_DATA`): `library.json`, `pdfs/<id>.pdf`, `backups/`. UI state stays in the browser (`localStorage["pdfdesk.ui.v1"]`).
+- **Under `studydesk`:** the library folder (`~/StudyDesk`, or an existing `~/PDFDesk`, or `--data-dir`, or `$STUDYDESK_DATA`): `library.json`, `pdfs/<id>.pdf`, `backups/`. UI state stays in the browser (`localStorage["pdfdesk.ui.v1"]`).
 - **On a static server (`npm run dev`):** browser storage, as in 0.1.x: `localStorage["researchdesk.v1"]` plus IndexedDB `researchdesk`/`files`. The keys keep the old ResearchDesk name so 0.1.x libraries are found and moved in.
 
 Full details, including the API, merging and security: [docs/architecture.md § Where your data lives](docs/architecture.md#where-your-data-lives) and [docs/disk-storage.md](docs/disk-storage.md). Export/import: [docs/export-import.md](docs/export-import.md).

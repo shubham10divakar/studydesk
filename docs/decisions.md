@@ -51,3 +51,9 @@ Adding a paper by arXiv ID or DOI is done by `pdfdesk` (`pdfdesk/lookup.py`), wh
 ## D-012 · The browser app is 1.x; the desktop app becomes 2.x (2026-11-03)
 The browser app shipped through `pdfdesk` is released as 1.0.0, its first stable version. The Tauri desktop app planned as 1.x in D-008 becomes 2.x; everything else in D-008 stands (same package name and command, platform wheels, export file as the upgrade path).
 *Why:* the browser app now covers the whole Phase 1 list, keeps the library in a folder on disk, and is what people install; calling it 0.x undersold it. A major version is the right signal for the switch to a different runtime and storage (SQLite).
+
+## D-013 · Name: StudyDesk, shipped on PyPI as `studydesk` (2026-11-13)
+PDFDesk is renamed StudyDesk: product, PyPI package and command `studydesk`, repo github.com/shubham10divakar/studydesk. `pdfdesk` 1.1.1 is the last release under the old name and points here; the old repo is frozen. Mentions of `pdfdesk` in D-001 to D-012 now mean `studydesk`.
+Kept on purpose: the browser storage keys (D-007, plus `pdfdesk.ui.v1` and `pdfdesk.browserChecked`), the file format ids `pdfdesk-library` and `pdfdesk-export`, and the user's library folder: with no `~/StudyDesk`, an existing `~/PDFDesk` (or `$PDFDESK_DATA`) is used as it is.
+*Why:* the app is growing from a PDF reader into a desk for everything you study (links, PDFs, documents, notes), and "PDF" in the name no longer fits. The initials are the author's. Nothing a user already has may look empty or fail to import after the switch.
+

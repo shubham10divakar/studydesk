@@ -4,18 +4,18 @@ Status: **built** for 0.2.0. Decision: decisions.md D-010. How it fits together:
 
 ## Problem
 
-Up to 0.1.x the live library is browser storage (see [architecture.md § Where your data lives](architecture.md#where-your-data-lives)). Storage is per browser and per origin, so `pdfdesk --port 8080`, `127.0.0.1:5173`, or a different browser each show an empty library. Clearing site data deletes it. Export/import only copies it by hand.
+Up to 0.1.x the live library is browser storage (see [architecture.md § Where your data lives](architecture.md#where-your-data-lives)). Storage is per browser and per origin, so `studydesk --port 8080`, `127.0.0.1:5173`, or a different browser each show an empty library. Clearing site data deletes it. Export/import only copies it by hand.
 
 ## Goal
 
-When PDFDesk runs under the `pdfdesk` command, the library is a normal folder on disk. Any port and any browser on the machine show the same library, and clearing browser data deletes nothing.
+When StudyDesk runs under the `studydesk` command, the library is a normal folder on disk. Any port and any browser on the machine show the same library, and clearing browser data deletes nothing.
 
 ## The folder
 
-Default `~/PDFDesk` (on Windows `C:\Users\<you>\PDFDesk`). Change it with `pdfdesk --data-dir <path>` or the `PDFDESK_DATA` environment variable. `pdfdesk` prints the path on startup and the About page shows it.
+Default `~/StudyDesk` (on Windows `C:\Users\<you>\StudyDesk`). If that folder doesn't exist but a PDFDesk library does (`~/PDFDesk` with a `library.json`), that folder is used as it is; `$PDFDESK_DATA` is honoured too (D-013). Change it with `studydesk --data-dir <path>` or the `STUDYDESK_DATA` environment variable. `studydesk` prints the path on startup and the About page shows it.
 
 ```
-~/PDFDesk/
+~/StudyDesk/
 ├─ library.json              every paper: status, tags, highlights, notes, sessions, bookmarks
 ├─ pdfs/<paper-id>.pdf       real PDF files, one per paper
 └─ backups/library-YYYY-MM-DD.json   copy of library.json taken on the first save of each day; last 14 kept
@@ -24,7 +24,7 @@ Default `~/PDFDesk` (on Windows `C:\Users\<you>\PDFDesk`). Change it with `pdfde
 `library.json` uses the export format's paper objects (data-model.md) with a header:
 `{"format":"pdfdesk-library","formatVersion":1,"savedAt":"…","papers":[…]}`. UI state (current view, zoom, filters) stays in each browser's localStorage; it isn't library data.
 
-## Server API (`pdfdesk/cli.py`, standard library only)
+## Server API (`studydesk/cli.py`, standard library only)
 
 | Method and path | Does |
 |---|---|
@@ -39,7 +39,7 @@ Default `~/PDFDesk` (on Windows `C:\Users\<you>\PDFDesk`). Change it with `pdfde
 
 The two `POST` actions reach outside the library (a program, the internet), so they also require the app's own `Origin` and a JSON content type, which other sites can't send without a CORS preflight.
 
-- **`rev`** is the file's modification time and size (`<mtime_ns>-<size>`), so two `pdfdesk` processes on different ports sharing one folder still see each other's changes.
+- **`rev`** is the file's modification time and size (`<mtime_ns>-<size>`), so two `studydesk` processes on different ports sharing one folder still see each other's changes.
 - **Atomic writes:** write to a temp file in the same folder, then `os.replace`. A crash never leaves a half-written `library.json`.
 - **Ids** must match `[A-Za-z0-9_-]{1,64}`; nothing outside the folder can be read or written.
 - **Security:** the server binds to 127.0.0.1 only. Every request must carry `Host: localhost:<port>` or `127.0.0.1:<port>`, which blocks DNS-rebinding pages, and requests with a foreign `Origin` are refused. Writes use `PUT`/`DELETE`, which a web page on another site can't send without a CORS preflight, and the server never answers preflights.
@@ -51,7 +51,7 @@ The two `POST` actions reach outside the library (a program, the internet), so t
 - **Saving:** papers are sent at most every 300 ms and only when they changed. UI state goes to localStorage as before.
 - **Another tab or port saved first** (`409`): the app does a three-way merge against the last version it saw (`merge3`): a change made on only one side wins, items removed on one side stay removed unless the other side changed them, and notes edited in both windows are kept one after the other. Then it saves again. Nothing either window wrote is lost.
 - **Coming back to a window** (focus or visibility): if the library changed on disk and this window has no unsaved changes, it reloads quietly.
-- **Server stopped while the app is open:** a banner says changes aren't being saved and to run `pdfdesk` again. Saving retries every few seconds and the banner clears once it succeeds.
+- **Server stopped while the app is open:** a banner says changes aren't being saved and to run `studydesk` again. Saving retries every few seconds and the banner clears once it succeeds.
 
 ## Moving existing browser libraries
 
@@ -63,7 +63,7 @@ The two `POST` actions reach outside the library (a program, the internet), so t
 
 `scripts/e2e/disk-storage.mjs` (headless Chrome, no npm packages):
 1. Add a PDF, highlight and note on port A: `library.json` and `pdfs/<id>.pdf` appear on disk, and the PDF is byte-identical.
-2. A second `pdfdesk` on port B with the same folder, in a fresh browser profile: same library, and the PDF renders.
+2. A second `studydesk` on port B with the same folder, in a fresh browser profile: same library, and the PDF renders.
 3. Two windows edit different papers at the same time: both edits are on disk.
 4. Migration: a 0.1.x browser library on an origin moves into an empty folder on first run.
 5. The server stopping while a page is open shows a warning, and saving resumes when it's back.

@@ -41,7 +41,7 @@ await js(`[...document.querySelectorAll('[data-act="open"]')].find(e => /Links i
 const p1 = await js(`[...document.querySelectorAll('#pages .page[data-n="1"] .pdf-link')].map(a => ({href: a.getAttribute("href"), target: a.target}))`);
 check(p1.length === 5, `page 1 has its 5 links (${p1.length})`);
 const web = p1.find(l => l.href.startsWith("http"));
-check(web && web.href === "https://github.com/shubham10divakar/pdfdesk" && web.target === "_blank", `the web link opens ${web && web.href} in a new tab`);
+check(web && web.href === "https://github.com/shubham10divakar/studydesk" && web.target === "_blank", `the web link opens ${web && web.href} in a new tab`);
 await shot("links-page1");
 
 // ---------- internal links land on the exact spot ----------
@@ -86,7 +86,7 @@ await altLeft();
 check(await page() === 3 && await inView("[ figure placeholder ]") && await back() === "← Back to p. 1", "Alt+← goes back to the figure, and the next Back is p. 1");
 await altLeft();
 check(await page() === 1 && await back() === null, "Alt+← again returns to page 1; nothing left to go back to");
-check((await js(`location.href`)).startsWith(app), "Alt+← with nothing left doesn't navigate the browser away (still on PDFDesk)");
+check((await js(`location.href`)).startsWith(app), "Alt+← with nothing left doesn't navigate the browser away (still on StudyDesk)");
 
 console.log(fails ? `\n${fails} FAILED` : "\nALL PASSED");
 ws.close(); process.exit(fails ? 1 : 0);

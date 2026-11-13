@@ -16,15 +16,15 @@ Export and import fix all three with one file.
 
 **Export library** (sidebar footer, and the *Your data* section of the About page):
 
-1. One click. The browser downloads `pdfdesk-export-2026-11-03.zip`.
+1. One click. The browser downloads `studydesk-export-2026-11-03.zip`.
 2. A toast confirms: "Exported 42 papers, 38 PDFs, 512 highlights, 230 sessions".
-3. A second option, **Export without PDFs** (About page), downloads `pdfdesk-backup-2026-11-03.json`: everything except the PDF copies, a few hundred KB, for frequent backups.
+3. A second option, **Export without PDFs** (About page), downloads `studydesk-backup-2026-11-03.json`: everything except the PDF copies, a few hundred KB, for frequent backups.
 4. The About page shows the date of the last export.
 
 **Import library** (same places):
 
 1. Pick a `.zip` (or the `.json` from an export without PDFs), or drop it on the window.
-2. PDFDesk reads it and shows a summary before changing anything:
+2. StudyDesk reads it and shows a summary before changing anything:
    "42 papers (39 new, 3 already in your library), 38 PDFs, 512 highlights, 230 sessions."
 3. Choose:
    - **Add to my library** (default): merges, never deletes anything (rules below).
@@ -38,7 +38,7 @@ Nothing is uploaded anywhere. The file is created and read entirely in the brows
 A plain `.zip` (stored, not compressed: PDFs are already compressed):
 
 ```
-pdfdesk-export-2026-11-03.zip
+studydesk-export-2026-11-03.zip
 ├─ library.json            everything except the PDFs (format below)
 ├─ pdfs/
 │   └─ <paper-id>.pdf      the stored copy of each PDF
@@ -47,7 +47,7 @@ pdfdesk-export-2026-11-03.zip
 └─ README.txt              what this file is and how to import it
 ```
 
-`notes/` is for people, not for import: the library is readable with any text editor even without PDFDesk.
+`notes/` is for people, not for import: the library is readable with any text editor even without StudyDesk.
 
 ### `library.json`
 
@@ -65,7 +65,7 @@ pdfdesk-export-2026-11-03.zip
 
 - Example papers (`sample: true`) are left out.
 - UI state (current view, zoom, filters) is left out: it belongs to the browser, not the library.
-- `formatVersion` changes only when the shape changes incompatibly. Importers accept every version up to their own and refuse newer ones with a clear message ("This file was made by a newer PDFDesk. Upgrade with `pip install -U pdfdesk`.").
+- `formatVersion` changes only when the shape changes incompatibly. Importers accept every version up to their own and refuse newer ones with a clear message ("This file was made by a newer StudyDesk. Upgrade with `pip install -U studydesk`.").
 
 ## Merge rules ("Add to my library")
 
@@ -88,7 +88,7 @@ The rule throughout: **import never deletes or overwrites anything the user wrot
 - **Storage full:** the browser may refuse very large libraries. Import stops, reports which papers were added, and suggests importing without PDFs.
 - **Damaged or unrelated file:** refused before anything changes, with a message naming the problem.
 - **Zips from other tools:** stored and deflate entries both import (deflate uses the browser's `DecompressionStream`). ZIP64 files (over 4 GB) are refused.
-- **Library on another port** (e.g. you ran `pdfdesk --port 8080` once): open that address, export there, import on `localhost:5173`.
+- **Library on another port** (e.g. you ran `studydesk --port 8080` once): open that address, export there, import on `localhost:5173`.
 
 ## How it will be built
 

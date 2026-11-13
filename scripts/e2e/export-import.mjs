@@ -46,13 +46,13 @@ await A.click('[data-act="tab"][data-v="notes"]'); await A.click('[data-act="nmo
 await A.js(`(() => { const t = document.querySelector('#noteTa'); t.value = "Note from A (p. 1)."; t.dispatchEvent(new Event("input", {bubbles:true})); })()`); await wait(700);
 await A.click('[data-act="home"]'); await wait(400);
 await A.click('.side-io [data-act="exp"]');
-const zipPath = await newFile(dlA, /^pdfdesk-export-\d{4}-\d\d-\d\d\.zip$/);
+const zipPath = await newFile(dlA, /^studydesk-export-\d{4}-\d\d-\d\d\.zip$/);
 check(!!zipPath, `export downloads a zip (${zipPath})`);
 log("  toast:", await A.toastText());
 await A.click('[data-act="about"].nav-i'); await wait(300);
 check(/Last export:/.test(await A.js(`document.querySelector('.data p').textContent`)), "About shows the last export date");
 await A.click('[data-act="exp-lite"]');
-const jsonPath = await newFile(dlA, /^pdfdesk-backup-.*\.json$/);
+const jsonPath = await newFile(dlA, /^studydesk-backup-.*\.json$/);
 check(!!jsonPath, `export without PDFs downloads a json (${jsonPath})`);
 writeFileSync(`${work}\\paths.json`, JSON.stringify({ zipPath, jsonPath }));
 
@@ -103,7 +103,7 @@ if (existsSync(defl)){
   check(PC && PC.hasFile && await C.js(`document.querySelectorAll('#pages .page canvas').length > 0`), "deflate-compressed zip imports and its PDF renders");
 } else log("SKIP deflate test (no deflated.zip yet)");
 await C.setFile("#impIn", `${work}\\bad.json`); await wait(800);
-check(/isn't a PDFDesk export/.test(await C.toastText()) && await C.js(`document.querySelector('#modal').hidden`), `bad file refused: "${await C.toastText()}"`);
+check(/isn't a StudyDesk export/.test(await C.toastText()) && await C.js(`document.querySelector('#modal').hidden`), `bad file refused: "${await C.toastText()}"`);
 
 log(fails ? `\n${fails} FAILED` : "\nALL PASSED");
 bws.close(); process.exit(fails ? 1 : 0);

@@ -1,4 +1,4 @@
-// Drive headless Chrome over CDP and capture PDFDesk screenshots.
+// Drive headless Chrome over CDP and capture StudyDesk screenshots.
 // Usage: node shoot.mjs <debugPort> <appUrl> <pdfPath> <outDir>
 import { writeFileSync } from "node:fs";
 const [port, app, pdf, out] = process.argv.slice(2);

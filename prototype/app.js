@@ -16,7 +16,7 @@ const fmtMin = m => m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`;
 const rel = t => { if(!t) return "Never"; const d = Math.round((day0()-day0(t))/DAY); return d===0?"Today":d===1?"Yesterday":d<7?`${d} days ago`:fmtDate(t); };
 const isoDay = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 
-const VERSION = "1.1.1"; // keep in step with pdfdesk/__init__.py
+const VERSION = "1.2.0"; // keep in step with studydesk/__init__.py
 const HEART = '<svg class="heart" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14s-5.5-3.4-5.5-7.3C2.5 4.6 4 3 5.9 3 7 3 7.6 3.6 8 4.3 8.4 3.6 9 3 10.1 3 12 3 13.5 4.6 13.5 6.7 13.5 10.6 8 14 8 14z"/></svg>';
 
 const STATUSES = [["inbox","Inbox"],["planned","Planned"],["reading","Reading"],["paused","Paused"],["completed","Completed"],["revisit","Revisit"]];
@@ -27,7 +27,7 @@ const HLC = {yellow:"Key idea", green:"Method / result", blue:"Definition", pink
 
 /* ---------------- storage ---------------- */
 // Two backends behind one interface (spec: docs/disk-storage.md):
-//  disk     under `pdfdesk`: library.json + pdfs/ in the library folder, through /api/ on the local server
+//  disk     under `studydesk`: library.json + pdfs/ in the library folder, through /api/ on the local server
 //  browser  on a plain static server (npm run dev, file://): localStorage + IndexedDB, as in 0.1.x
 const KEY = "researchdesk.v1", UIKEY = "pdfdesk.ui.v1", LEFTKEY = "pdfdesk.browserChecked";
 let S;
@@ -164,7 +164,7 @@ const diskFiles = {
   get: async k => { if (memFiles.has(k)) return memFiles.get(k); try { const r = await fetch(`api/pdf/${encodeURIComponent(k)}`); return r.ok ? await r.blob() : null; } catch(e){ return null; } },
   del: k => { memFiles.delete(k); return fetch(`api/pdf/${encodeURIComponent(k)}`, {method:"DELETE"}).catch(()=>{}); }
 };
-let idb = bidb; // switched to diskFiles in boot() when running under pdfdesk
+let idb = bidb; // switched to diskFiles in boot() when running under studydesk
 
 /* ---------------- example library ---------------- */
 function seed(){
@@ -236,8 +236,8 @@ function renderSide(){
   const hasEx = S.papers.some(p => p.sample), nLink = S.papers.filter(isLink).length;
   $("#side").innerHTML = `
     <div class="brand-wrap">
-      <div class="brand"><b>PDFDesk</b><span>local</span><button class="icon-b side-x" data-act="side" title="Hide the sidebar ( [ )" aria-label="Hide the library sidebar">${ICON.sideL}</button></div>
-      <button class="byline" data-act="about" title="About PDFDesk and its author">Built by ${esc(AUTHOR.name)} with ${HEART}<span class="vh">love</span></button>
+      <div class="brand"><b>StudyDesk</b><span>local</span><button class="icon-b side-x" data-act="side" title="Hide the sidebar ( [ )" aria-label="Hide the library sidebar">${ICON.sideL}</button></div>
+      <button class="byline" data-act="about" title="About StudyDesk and its author">Built by ${esc(AUTHOR.name)} with ${HEART}<span class="vh">love</span></button>
     </div>
     <button class="btn primary" data-act="add">+ Add PDFs</button>
     <div class="add-more"><button class="add-id" data-act="add-id">Add by arXiv ID or DOI</button><button class="add-id" data-act="add-link">Add by link, without the PDF</button></div>
@@ -396,11 +396,11 @@ function toggleBar(which){
 }
 
 /* ---------------- about ---------------- */
-// Who built PDFDesk and where to reach them. Links with an empty url are not shown.
+// Who built StudyDesk and where to reach them. Links with an empty url are not shown.
 const AUTHOR = {
   name: "Subham Divakar",
   role: "Software engineer and ML researcher",
-  bio: "I built PDFDesk for myself. I read a lot of papers and kept losing track of what I'd read, how far I got and why it mattered. So I built a tool for complete note-making across PDFs and slide decks. I've made notes in it every day for over two years. People who saw it loved it, so here it is: a small version of that tool. More features are on the way.",
+  bio: "I built StudyDesk for myself. I read a lot of papers and kept losing track of what I'd read, how far I got and why it mattered. So I built a tool for complete note-making across PDFs and slide decks. I've made notes in it every day for over two years. People who saw it loved it, so here it is: a small version of that tool. More features are on the way.",
   links: [
     {label:"Website", handle:"subhamdivakar.com", url:"https://subhamdivakar.com/"},
     {label:"LinkedIn", handle:"subham-divakar", url:"https://www.linkedin.com/in/subham-divakar-a7420a12a/"},
@@ -409,7 +409,7 @@ const AUTHOR = {
     {label:"PyPI", handle:"shubham10divakar", url:"https://pypi.org/user/shubham10divakar/"},
   ],
 };
-const REPO = "https://github.com/shubham10divakar/pdfdesk";
+const REPO = "https://github.com/shubham10divakar/studydesk";
 const FEATURES = [
   ["Library and lifecycle", [
     "Every paper moves through Inbox, Planned, Reading, Paused, Completed and Revisit",
@@ -457,7 +457,7 @@ const FEATURES = [
     "Import merges into your library and never deletes what you wrote, or replaces it after asking",
     "Drop an export file on the window to import it"]],
   ["Private and offline", [
-    "Your library is a folder on your computer (PDFDesk in your home folder) with real PDF files and daily backups",
+    "Your library is a folder on your computer (StudyDesk in your home folder) with real PDF files and daily backups",
     "Any browser or port on this computer shows the same library; no account, no cloud, no tracking",
     "The PDF engine and fonts are built in, so it works without internet",
     "Dark mode follows your system setting"]],
@@ -469,7 +469,7 @@ function aboutHTML(){
   const initials = AUTHOR.name.split(" ").map(w => w[0]).join("").slice(0, 2);
   const nFeat = FEATURES.reduce((a, f) => a + f[1].length, 0);
   return `<div class="wrap about">
-    <div><div class="eyebrow">About</div><h1 class="page-h">PDFDesk</h1><p class="sub">A reading desk for research papers. Version <span class="num">${VERSION}</span>.</p></div>
+    <div><div class="eyebrow">About</div><h1 class="page-h">StudyDesk</h1><p class="sub">A reading desk for research papers. Version <span class="num">${VERSION}</span>.</p></div>
 
     <section class="me" aria-labelledby="me-h">
       <div class="me-av" aria-hidden="true">${esc(initials)}</div>
@@ -493,7 +493,7 @@ function aboutHTML(){
 
     <section class="data" aria-labelledby="dt-h">
       <div><h2 id="dt-h">Your data</h2>
-      <p>${DISK.on ? `Your library is a folder on this computer: ${folderLink()}. It holds library.json and your PDFs as normal files, with a daily backup. Every browser and port on this computer shows the same library, and adding a PDF never touches your original file. Export to move the library to another computer or keep an extra copy.` : `Your library lives in this browser at this address. Adding a PDF saves a copy here; your original file is never touched. Export to back it up or move it to another browser or computer. Run PDFDesk with the pdfdesk command to keep the library in a folder on disk instead.`}${S.ui.lastExport ? ` Last export: ${esc(fmtDay(S.ui.lastExport))}.` : " You haven't exported yet."}</p></div>
+      <p>${DISK.on ? `Your library is a folder on this computer: ${folderLink()}. It holds library.json and your PDFs as normal files, with a daily backup. Every browser and port on this computer shows the same library, and adding a PDF never touches your original file. Export to move the library to another computer or keep an extra copy.` : `Your library lives in this browser at this address. Adding a PDF saves a copy here; your original file is never touched. Export to back it up or move it to another browser or computer. Run StudyDesk with the studydesk command to keep the library in a folder on disk instead.`}${S.ui.lastExport ? ` Last export: ${esc(fmtDay(S.ui.lastExport))}.` : " You haven't exported yet."}</p></div>
       <div class="fb-acts">
         <button class="btn primary" data-act="exp">Export library</button>
         <button class="btn" data-act="exp-lite">Export without PDFs</button>
@@ -502,7 +502,7 @@ function aboutHTML(){
     </section>
 
     <section class="sec" aria-labelledby="ft-h">
-      <div class="sec-h"><h2 id="ft-h">Everything PDFDesk does</h2><span class="meta">${nFeat} features</span></div>
+      <div class="sec-h"><h2 id="ft-h">Everything StudyDesk does</h2><span class="meta">${nFeat} features</span></div>
       <div class="ft-grid">
         ${FEATURES.map(([h, items]) => `<div class="ft"><h3>${esc(h)}</h3><ul>${items.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("")}
         <div class="ft"><h3>Keyboard shortcuts</h3><div class="kb">${KEYS.map(([ks, what]) => `<div class="kb-row"><span>${ks.map(k => `<kbd>${esc(k)}</kbd>`).join(" ")}</span><span>${esc(what)}</span></div>`).join("")}</div></div>
@@ -930,7 +930,7 @@ async function importFiles(files){
   const pdfs = [...files].filter(f => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
   const exp = [...files].find(f => !pdfs.includes(f) && isExportFile(f));
   if (exp) startImport(exp);
-  if (!pdfs.length){ if (!exp) toast("Only PDF files, or a PDFDesk export (.zip or .json), can be added."); return; }
+  if (!pdfs.length){ if (!exp) toast("Only PDF files, or a StudyDesk export (.zip or .json), can be added."); return; }
   toast(`Adding ${pdfs.length} ${pdfs.length===1?"PDF":"PDFs"}…`);
   for (const f of pdfs){
     const m = await readPdfMeta(f);
@@ -1007,7 +1007,7 @@ async function zipRead(file, ent){ // -> Blob of the entry's contents
   const start = ent.lo + 30 + lh.getUint16(26, true) + lh.getUint16(28, true), raw = file.slice(start, start + ent.csize);
   if (ent.method === 0) return raw;
   if (ent.method === 8 && typeof DecompressionStream === "function") return new Response(raw.stream().pipeThrough(new DecompressionStream("deflate-raw"))).blob();
-  throw new Error("This zip uses a compression method PDFDesk can't read.");
+  throw new Error("This zip uses a compression method StudyDesk can't read.");
 }
 
 const slug = s => String(s || "paper").toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_-]+/g, "-").slice(0, 60) || "paper";
@@ -1017,7 +1017,7 @@ function paperMarkdown(p){
   const src = [p.url && SAFE_URL.test(p.url) ? `Link: ${p.url}` : "", isLink(p) ? "No PDF yet" : ""].filter(Boolean).join(" · ");
   return `# ${p.title}\n\n${meta ? meta + "\n\n" : ""}${src ? src + "\n\n" : ""}Status: ${SLABEL[p.status] || p.status}${p.tags.length ? ` · Tags: ${p.tags.join(", ")}` : ""}\n\n${p.abstract ? `## Abstract\n\n${p.abstract.trim()}\n\n` : ""}## Notes\n\n${p.notes.trim() || "_No notes yet._"}\n\n## Highlights\n\n${hls.join("\n") || "_No highlights yet._"}\n`;
 }
-const exportReadme = n => `PDFDesk library export\n\nlibrary.json  every paper with its status, tags, highlights, notes, sessions and bookmarks\npdfs/         the stored copy of each PDF, named by paper id\nnotes/        one Markdown file per paper, readable in any text editor\n\nTo restore: open PDFDesk, go to About (or the sidebar footer), choose Import library and pick this file.\nPapers: ${n}. Made with PDFDesk ${VERSION}.\n`;
+const exportReadme = n => `StudyDesk library export\n\nlibrary.json  every paper with its status, tags, highlights, notes, sessions and bookmarks\npdfs/         the stored copy of each PDF, named by paper id\nnotes/        one Markdown file per paper, readable in any text editor\n\nTo restore: open StudyDesk, go to About (or the sidebar footer), choose Import library and pick this file.\nPapers: ${n}. Made with StudyDesk ${VERSION}.\n`;
 
 function download(blob, name){
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
@@ -1032,7 +1032,7 @@ async function exportLibrary(withPdfs, then){
   const stamp = isoDay(Date.now()), lib = {format:EXPORT_FORMAT, formatVersion:EXPORT_VERSION, appVersion:VERSION, exportedAt:new Date().toISOString(), includesPdfs:withPdfs, papers};
   const count = {pdfs:0, hl:papers.reduce((a, p) => a + p.highlights.length, 0), ses:papers.reduce((a, p) => a + p.sessions.length, 0)};
   try {
-    if (!withPdfs){ download(new Blob([JSON.stringify(lib, null, 1)], {type:"application/json"}), `pdfdesk-backup-${stamp}.json`); }
+    if (!withPdfs){ download(new Blob([JSON.stringify(lib, null, 1)], {type:"application/json"}), `studydesk-backup-${stamp}.json`); }
     else {
       const files = [{name:"library.json", data:enc.encode(JSON.stringify(lib, null, 1))}], used = new Set();
       for (const p of papers){
@@ -1041,7 +1041,7 @@ async function exportLibrary(withPdfs, then){
         files.push({name:`notes/${s}.md`, data:enc.encode(paperMarkdown(p))});
       }
       files.push({name:"README.txt", data:enc.encode(exportReadme(papers.length))});
-      download(zipBlob(files), `pdfdesk-export-${stamp}.zip`);
+      download(zipBlob(files), `studydesk-export-${stamp}.zip`);
     }
   } catch(err){ toast(`Export failed: ${err.message}`); return false; }
   S.ui.lastExport = Date.now(); save();
@@ -1069,11 +1069,11 @@ async function readImport(file){
     try { lib = JSON.parse(await file.text()); } catch(e){ throw new Error("This file isn't valid JSON."); }
   } else {
     zip = await zipIndex(file);
-    const ent = zip.get("library.json"); if (!ent) throw new Error("This zip has no library.json, so it isn't a PDFDesk export.");
+    const ent = zip.get("library.json"); if (!ent) throw new Error("This zip has no library.json, so it isn't a StudyDesk export.");
     try { lib = JSON.parse(await (await zipRead(file, ent)).text()); } catch(e){ throw new Error("library.json in this zip is damaged."); }
   }
-  if (!lib || lib.format !== EXPORT_FORMAT || !Array.isArray(lib.papers)) throw new Error("This file isn't a PDFDesk export.");
-  if (+lib.formatVersion > EXPORT_VERSION) throw new Error("This file was made by a newer PDFDesk. Upgrade with pip install -U pdfdesk, then import again.");
+  if (!lib || lib.format !== EXPORT_FORMAT || !Array.isArray(lib.papers)) throw new Error("This file isn't a StudyDesk export.");
+  if (+lib.formatVersion > EXPORT_VERSION) throw new Error("This file was made by a newer StudyDesk. Upgrade with pip install -U studydesk, then import again.");
   const papers = lib.papers.filter(p => p && p.id && !p.sample).map(cleanPaper);
   const pdfIds = new Set(zip ? papers.filter(p => zip.has(`pdfs/${p.id}.pdf`)).map(p => p.id) : []);
   return {file, zip, papers, pdfIds, exportedAt:lib.exportedAt};
@@ -1201,7 +1201,7 @@ async function followDest(dest, from){
     const {n, top} = await resolveDest(R.pdf, dest);
     rememberSpot(from || R.current);
     await jumpTo(n, top);
-  } catch(e){ toast("This link points to a place PDFDesk can't find in the file."); }
+  } catch(e){ toast("This link points to a place StudyDesk can't find in the file."); }
 }
 // Where you were: the page the link was on, and the scroll position measured from that page (in page
 // heights), so it survives zooming and re-fitting. The label names the link's page, which is what you read.
@@ -1309,7 +1309,7 @@ async function reanchor(pid){
 }
 
 /* ---------------- add by arXiv id or DOI ---------------- */
-// The pdfdesk server looks the paper up (arXiv / Crossref) and, for arXiv, saves the PDF into the library folder.
+// The studydesk server looks the paper up (arXiv / Crossref) and, for arXiv, saves the PDF into the library folder.
 function arxivBase(q){ const m = /(\d{4}\.\d{4,5})|([a-z][a-z.\-]*\/\d{7})/i.exec(q || ""); return m ? (m[1] || m[2]).toLowerCase() : ""; }
 function doiOf(q){ const m = /(10\.\d{4,9}\/[^\s"<>]+)/.exec(q || ""); return m ? m[1].replace(/[.,;]+$/, "").toLowerCase() : ""; }
 function existingFor(q){
@@ -1324,7 +1324,7 @@ function showAddById(){
     <input class="in" id="idIn" autocomplete="off" spellcheck="false" placeholder="1706.03762, arxiv.org/abs/…, or 10.…/…" aria-label="arXiv ID or DOI">
     <p class="hint" id="idMsg" role="status"></p>
     <div class="mdl-foot"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" id="idGo" data-act="add-id-go">Add paper</button></div>`
-    : `<p>Looking papers up needs PDFDesk started with the <span class="num">pdfdesk</span> command, which fetches the details (and arXiv PDFs) for you. Here you can still add PDFs you've downloaded.</p>
+    : `<p>Looking papers up needs StudyDesk started with the <span class="num">studydesk</span> command, which fetches the details (and arXiv PDFs) for you. Here you can still add PDFs you've downloaded.</p>
     <div class="mdl-foot"><button class="btn primary" data-act="modal-close">OK</button></div>`}
   </div>`;
   m.hidden = false; ($("#idIn") || m.querySelector(".btn.primary")).focus();
@@ -1340,7 +1340,7 @@ async function addById(){
   catch(e){ r = null; }
   if (!r || !r.ok || !data || !data.paper){
     go.disabled = inp.disabled = false; go.textContent = "Add paper";
-    msg.textContent = (data && data.error) || "PDFDesk couldn't look that up. Is pdfdesk still running?"; inp.focus(); inp.select(); return;
+    msg.textContent = (data && data.error) || "StudyDesk couldn't look that up. Is studydesk still running?"; inp.focus(); inp.select(); return;
   }
   const m = data.paper, dup = S.papers.find(p => (m.arxiv && p.arxiv === m.arxiv) || (m.doi && (p.doi || "").toLowerCase() === m.doi.toLowerCase()));
   if (dup){ if (data.hasFile) idb.del(id); closeModal(); toast(`“${dup.title}” is already in your library`); openReader(dup.id); return; }
@@ -1393,7 +1393,7 @@ function linkUrlChanged(){
   const what = arxiv ? `arXiv ${esc(arxiv)}` : `DOI ${esc(doi)}`;
   box.hidden = false;
   box.innerHTML = DISK.on ? `<span>This is ${what}.</span><button class="btn sm" data-act="lk-fill">Fill in from ${arxiv ? "arXiv" : "Crossref"}</button>${arxiv ? `<span class="hint">The PDF comes with it.</span>` : ""}`
-    : `<span>This is ${what}. Start PDFDesk with the <span class="num">pdfdesk</span> command to fill the details in from ${arxiv ? "arXiv" : "Crossref"}.</span>`;
+    : `<span>This is ${what}. Start StudyDesk with the <span class="num">studydesk</span> command to fill the details in from ${arxiv ? "arXiv" : "Crossref"}.</span>`;
 }
 async function linkFill(){
   const u = $("#lkUrl").value.trim(), {arxiv, doi} = linkIds(u), msg = $("#lkMsg"), b = document.querySelector('[data-act="lk-fill"]');
@@ -1404,7 +1404,7 @@ async function linkFill(){
   try { r = await fetch("api/lookup", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({query:arxiv || doi, id:lid})}); data = await r.json().catch(() => null); } catch(e){}
   if (!LINK || LINK.id !== lid){ if (data && data.hasFile) idb.del(lid); return; }   // the form was closed while looking up
   if (b){ b.disabled = false; b.textContent = `Fill in from ${arxiv ? "arXiv" : "Crossref"}`; }
-  if (!r || !r.ok || !data || !data.paper){ msg.textContent = (data && data.error) || "PDFDesk couldn't look that up. Is pdfdesk still running?"; return; }
+  if (!r || !r.ok || !data || !data.paper){ msg.textContent = (data && data.error) || "StudyDesk couldn't look that up. Is studydesk still running?"; return; }
   const m = data.paper;
   $("#lkTitle").value = m.title || $("#lkTitle").value; $("#lkAuth").value = m.authors || $("#lkAuth").value;
   $("#lkVenue").value = m.venue || $("#lkVenue").value; $("#lkYear").value = m.year || $("#lkYear").value;
@@ -1817,7 +1817,7 @@ function checkLeftovers(){
   if (!extra.length){ try { localStorage.setItem(LEFTKEY, "1"); } catch(e){} return; }
   LEFT = extra;
   const n = extra.length, one = n === 1, b = $("#leftbar");
-  b.innerHTML = `<span>This browser has <b class="num">${n}</b> ${one ? "paper" : "papers"} from an older PDFDesk that ${one ? "isn't" : "aren't"} in your library folder.</span>
+  b.innerHTML = `<span>This browser has <b class="num">${n}</b> ${one ? "paper" : "papers"} from an older StudyDesk that ${one ? "isn't" : "aren't"} in your library folder.</span>
     <button class="btn sm primary" data-act="left-add">Add ${one ? "it" : "them"} to my library</button><button class="btn sm ghost" data-act="left-skip">Not now</button>`;
   b.hidden = false;
 }
@@ -1836,7 +1836,7 @@ async function addLeftovers(){
 async function boot(){
   let info = null, note = "";
   try { const r = await fetch("api/info", {cache:"no-store"}); if (r.ok) info = await r.json(); } catch(e){}
-  if (info && info.app === "pdfdesk"){
+  if (info && info.app === "studydesk"){
     DISK.on = true; DISK.dir = info.dataDir; DISK.platform = info.platform || ""; idb = diskFiles;
     let ui = null; try { ui = JSON.parse(localStorage.getItem(UIKEY)); } catch(e){}
     const old = load(), L = await (await fetch("api/library", {cache:"no-store"})).json();

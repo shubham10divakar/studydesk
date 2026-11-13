@@ -1,6 +1,6 @@
 // Papers saved as a link, without the PDF: the form (BibTeX, tags, notes), the paper page, no sessions,
 // attaching the PDF later, arXiv fill-in (NEEDS INTERNET), and browser-storage mode.
-// Starts its own pdfdesk (throwaway folder) and static server. Run Chrome with a fresh --user-data-dir. From the repo root:
+// Starts its own studydesk (throwaway folder) and static server. Run Chrome with a fresh --user-data-dir. From the repo root:
 //   node scripts/e2e/link-papers.mjs <chromeDebugPort> <abs path>/sample-paper.pdf <abs empty work dir> [outDir]
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -12,7 +12,7 @@ rmSync(work, { recursive: true, force: true }); mkdirSync(work, { recursive: tru
 const D = join(work, "lib"), procs = [];
 const serve = (args, cmd = "python") => { const p = spawn(cmd, args, { stdio: "ignore" }); procs.push(p); return p; };
 const up = async port => { for (let i = 0; i < 60; i++) { try { await fetch(`http://localhost:${port}/`); return; } catch { await wait(150); } } throw new Error("no server on " + port); };
-serve(["-m", "pdfdesk", "--no-browser", "--port", "5211", "--data-dir", D]); serve(["scripts/serve.mjs", "5212"], process.execPath);
+serve(["-m", "studydesk", "--no-browser", "--port", "5211", "--data-dir", D]); serve(["scripts/serve.mjs", "5212"], process.execPath);
 await up(5211); await up(5212);
 
 const list = await (await fetch(`http://127.0.0.1:${dport}/json/list`)).json();
@@ -149,7 +149,7 @@ try {
   await cdp("Page.navigate", { url: "http://localhost:5212/" }); await wait(1800);
   await click('.side [data-act="add-link"]'); await wait(200);
   await setVal("#lkUrl", "https://doi.org/10.1145/3292500.3330701"); await wait(150);
-  check(/Start PDFDesk with the/.test(await txt("#lkFound")), "on a static server a DOI link explains that lookup needs the pdfdesk command");
+  check(/Start StudyDesk with the/.test(await txt("#lkFound")), "on a static server a DOI link explains that lookup needs the studydesk command");
   await setVal("#lkTitle", "Optuna"); await click('[data-act="lk-save"]'); await wait(800);
   const st = await js(`JSON.parse(localStorage.getItem("researchdesk.v1")).papers.find(p => p.title === "Optuna")`);
   check(st && !st.hasFile && st.doi === "10.1145/3292500.3330701", "it can still be added by hand, with the DOI kept for spotting duplicates");

@@ -14,9 +14,9 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-from pdfdesk import __version__
+from studydesk import __version__
 
-USER_AGENT = f"PDFDesk/{__version__} (+https://github.com/shubham10divakar/pdfdesk)"
+USER_AGENT = f"StudyDesk/{__version__} (+https://github.com/shubham10divakar/studydesk)"
 TIMEOUT = 25
 MAX_PDF = 150 << 20  # 150 MB
 
@@ -97,7 +97,7 @@ def arxiv(aid: str) -> dict:
     try:
         root = ET.fromstring(body)
     except ET.ParseError as e:
-        raise LookupError_("arXiv sent something PDFDesk couldn't read. Try again in a minute.", 502) from e
+        raise LookupError_("arXiv sent something StudyDesk couldn't read. Try again in a minute.", 502) from e
     entry = root.find("a:entry", NS)
     title = entry.findtext("a:title", "", NS) if entry is not None else ""
     if entry is None or not title.strip() or "/api/errors" in (entry.findtext("a:id", "", NS) or ""):
@@ -131,7 +131,7 @@ def crossref(doi: str) -> dict:
     try:
         msg = json.loads(body.decode("utf-8"))["message"]
     except (ValueError, KeyError) as e:
-        raise LookupError_("Crossref sent something PDFDesk couldn't read. Try again in a minute.", 502) from e
+        raise LookupError_("Crossref sent something StudyDesk couldn't read. Try again in a minute.", 502) from e
     title = clean((msg.get("title") or [""])[0])
     sub = clean((msg.get("subtitle") or [""])[0])
     if sub and sub.lower() not in title.lower():

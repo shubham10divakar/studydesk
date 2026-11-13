@@ -14,7 +14,7 @@ index.html ─┬─ styles.css      tokens + layout
                  ├─ export/import  zipBlob / zipIndex / zipRead, exportLibrary, readImport, applyImport
                  ├─ links/contents drawLinks, resolveDest/followDest, rememberSpot/goBack, loadOutline
                  ├─ search         searchLibrary / searchHTML (notes, highlights, session takeaways)
-                 ├─ add by id      showAddById / addById  ──▶ POST /api/lookup (pdfdesk/lookup.py)
+                 ├─ add by id      showAddById / addById  ──▶ POST /api/lookup (studydesk/lookup.py)
                  ├─ re-anchoring   reanchor / findHighlight / rectsFor (on Replace PDF)
                  └─ events     delegated click on [data-act], input, keydown, selection
 ```
@@ -45,7 +45,7 @@ After the text layer, `drawLinks` asks PDF.js for the page's link annotations an
 `searchLibrary(papers, q)`: every word must appear in the item (case- and accent-insensitive via NFKD folding). Items are highlights (text + comment), each line of the notes (its first `p. N` gives the page) and session takeaways, within the papers the current filter shows. Results render under the papers table, grouped by paper; note results open the Notes tab and `showNoteMatch` scrolls to the matching line.
 
 ### Add by arXiv ID or DOI
-`addById` posts `{query, id}` to `/api/lookup`. `pdfdesk/lookup.py` parses the id (`parse_query`: arXiv new/old style, arXiv DOIs, abs/pdf links, DOIs, doi.org links), reads `export.arxiv.org/api/query` (Atom) or `api.crossref.org/works/<doi>` (JSON, HTML stripped, subtitle appended), and for arXiv downloads `arxiv.org/pdf/<id>` and saves it as `pdfs/<id>.pdf`. `fetch` refuses any other host (D-011). The app checks for an existing paper with the same arXiv id or DOI before looking anything up.
+`addById` posts `{query, id}` to `/api/lookup`. `studydesk/lookup.py` parses the id (`parse_query`: arXiv new/old style, arXiv DOIs, abs/pdf links, DOIs, doi.org links), reads `export.arxiv.org/api/query` (Atom) or `api.crossref.org/works/<doi>` (JSON, HTML stripped, subtitle appended), and for arXiv downloads `arxiv.org/pdf/<id>` and saves it as `pdfs/<id>.pdf`. `fetch` refuses any other host (D-011). The app checks for an existing paper with the same arXiv id or DOI before looking anything up.
 
 ### Add by link (papers without a PDF)
 `showAddLink` keeps a draft in `LINK` (`{id, tags, hasFile, arxiv, doi}`); its tag box is the shared tag picker with `kind = "draft"`. `parseBibtex` reads the BibTeX Google Scholar gives (brace/quote values, LaTeX accents, `and others` → et al., arXiv preprints → `arxiv`). Nothing is fetched from the pasted link itself (D-011): only arXiv links and DOIs can be filled in, through the same `/api/lookup` (the PDF is downloaded under the draft's id and deleted again if the form is cancelled). Duplicates are matched on arXiv id, DOI or the exact link. A paper with `!hasFile && !sample` (`isLink`) opens through `openLinkPaper`: `R.link` is set and `R.session` is null, so no session is logged; the panel drops the page tools.
@@ -60,17 +60,17 @@ A 1-second ticker adds to `R.session.active` only if the tab is visible and ther
 
 There are two storage backends behind one interface (`save()` and the `idb` helper). `boot()` picks one at startup. Spec: [disk-storage.md](disk-storage.md), decision D-010.
 
-**Under `pdfdesk` (0.2+): a folder on disk.** `boot()` finds the server's `/api/info`, switches `idb` to the disk implementation and loads `/api/library`.
+**Under `studydesk` (0.2+): a folder on disk.** `boot()` finds the server's `/api/info`, switches `idb` to the disk implementation and loads `/api/library`.
 
 ```
-~/PDFDesk/                       (or --data-dir / $PDFDESK_DATA; printed at startup, shown on About)
+~/StudyDesk/                       (or --data-dir / $STUDYDESK_DATA; printed at startup, shown on About)
 ├─ library.json                  {"format":"pdfdesk-library","formatVersion":1,"savedAt":…,"papers":[…]}
 ├─ pdfs/<paper-id>.pdf           real PDF files
 └─ backups/library-YYYY-MM-DD.json   first save of each day; last 14 kept
 ```
 
 ```
-app.js                                  pdfdesk/cli.py (Handler)        pdfdesk/store.py (Store)
+app.js                                  studydesk/cli.py (Handler)        studydesk/store.py (Store)
 save() ─ 300 ms ─▶ pushDisk() ─ PUT /api/library {baseRev, papers} ─▶ write(): rev check, backup, atomic replace
   409 {rev, papers} ◀─ another window/port saved first ◀────────────── Conflict
   └▶ merge3(base, theirs, mine) and save again
@@ -79,7 +79,7 @@ focus or visible ─▶ syncFromDisk() ─ GET /api/info (rev changed?) ─ GET 
 ```
 
 - **Same library everywhere on the machine.** Any port, `127.0.0.1` or `localhost`, any browser. Clearing browser data deletes nothing. Importing a PDF still copies it (into `pdfs/`); the original is never touched.
-- **`rev`** is `library.json`'s mtime and size, so two `pdfdesk` processes sharing a folder see each other's writes.
+- **`rev`** is `library.json`'s mtime and size, so two `studydesk` processes sharing a folder see each other's writes.
 - **`merge3`** merges against `DISK.base`, the last version this window read or wrote: a change made on only one side wins, removals are honoured unless the other side changed that item, and notes edited in both windows are kept one after the other under "Also written in another window". Nothing either window wrote is lost.
 - **UI state** (view, zoom, filters) stays in each browser's localStorage under `pdfdesk.ui.v1`.
 - **Server stopped while a page is open:** `#netbar` says so, and `pushDisk` retries every 4 s until it gets through.
@@ -99,8 +99,8 @@ Export library ─▶ exportLibrary(true)
                    idb.get(id) per PDF ──┼─▶ pdfs/<id>.pdf      the stored copy, byte for byte
                    paperMarkdown(p) ─────┼─▶ notes/<slug>.md    notes + highlights, for people
                                          └─▶ README.txt
-                   zipBlob(files) ─▶ <a download> pdfdesk-export-YYYY-MM-DD.zip
-Export without PDFs ─▶ exportLibrary(false) ─▶ pdfdesk-backup-YYYY-MM-DD.json (library.json only)
+                   zipBlob(files) ─▶ <a download> studydesk-export-YYYY-MM-DD.zip
+Export without PDFs ─▶ exportLibrary(false) ─▶ studydesk-backup-YYYY-MM-DD.json (library.json only)
 
 Import library / drop a .zip or .json
   ─▶ readImport(file)    zipIndex reads the central directory; zipRead extracts one entry

@@ -1,7 +1,7 @@
 """The library folder: library.json, pdfs/<id>.pdf and daily backups. Standard library only.
 
 Spec: docs/disk-storage.md. Writes are atomic (temp file + os.replace), and the revision token is the
-file's mtime and size, so several pdfdesk processes on different ports can share one folder.
+file's mtime and size, so several studydesk processes on different ports can share one folder.
 """
 
 from __future__ import annotations
@@ -34,8 +34,15 @@ class Conflict(Exception):
 
 
 def default_dir() -> Path:
-    env = os.environ.get("PDFDESK_DATA")
-    return Path(env) if env else Path.home() / "PDFDesk"
+    """$STUDYDESK_DATA, else ~/StudyDesk. A PDFDesk library (~/PDFDesk or $PDFDESK_DATA) is used as it is
+    while there is no ~/StudyDesk, so people coming from pdfdesk keep their library without moving it (D-013)."""
+    env = os.environ.get("STUDYDESK_DATA") or os.environ.get("PDFDESK_DATA")
+    if env:
+        return Path(env)
+    new, old = Path.home() / "StudyDesk", Path.home() / "PDFDesk"
+    if not new.exists() and (old / "library.json").exists():
+        return old
+    return new
 
 
 def _replace(tmp: str, target: Path) -> None:

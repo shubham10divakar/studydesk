@@ -1,29 +1,27 @@
 <div align="center">
 
-# PDFDesk
+# StudyDesk
 
 ### Your reading desk for research papers.
 
 **Library, PDF reader, highlights, notes, and a complete log of your reading, all in one window, all on your machine.**
 
-[![PyPI](https://img.shields.io/pypi/v/pdfdesk?color=2f55d4&label=pypi)](https://pypi.org/project/pdfdesk/)
-[![Downloads](https://img.shields.io/pepy/dt/pdfdesk?label=downloads)](https://pepy.tech/projects/pdfdesk)
-[![Downloads / month](https://img.shields.io/pypi/dm/pdfdesk?label=downloads%2Fmonth)](https://pypistats.org/packages/pdfdesk)
-[![Python](https://img.shields.io/pypi/pyversions/pdfdesk)](https://pypi.org/project/pdfdesk/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/shubham10divakar/pdfdesk/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/studydesk?color=2f55d4&label=pypi)](https://pypi.org/project/studydesk/)
+[![Downloads](https://img.shields.io/pepy/dt/studydesk?label=downloads)](https://pepy.tech/projects/studydesk)
+[![Downloads / month](https://img.shields.io/pypi/dm/studydesk?label=downloads%2Fmonth)](https://pypistats.org/packages/studydesk)
+[![Python](https://img.shields.io/pypi/pyversions/studydesk)](https://pypi.org/project/studydesk/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/shubham10divakar/studydesk/blob/main/LICENSE)
 
 ```bash
-pip install pdfdesk && pdfdesk
+pip install studydesk && studydesk
 ```
 
-<img src="https://raw.githubusercontent.com/shubham10divakar/pdfdesk/main/docs/assets/overview.png" alt="PDFDesk overview: reading stats, continue reading, reading calendar, up next and revision queue" width="100%">
+<img src="https://raw.githubusercontent.com/shubham10divakar/studydesk/main/docs/assets/overview.png" alt="StudyDesk overview: reading stats, continue reading, reading calendar, up next and revision queue" width="100%">
 
 </div>
 
-> [!IMPORTANT]
-> **PDFDesk is now StudyDesk.** The app is growing from a PDF reader into a desk for everything you study: links, PDFs, documents and notes. New versions ship as [`studydesk`](https://pypi.org/project/studydesk/), developed at [github.com/shubham10divakar/studydesk](https://github.com/shubham10divakar/studydesk). This is the last release of `pdfdesk`.
->
-> To switch: `pip install studydesk && studydesk`. Your library in `~/PDFDesk` is picked up as it is, nothing to export or move.
+> [!NOTE]
+> **StudyDesk was called PDFDesk.** It is growing from a PDF reader into a desk for everything you study: links, PDFs, documents and notes. Coming from `pdfdesk`? Run `pip install studydesk && studydesk`: your library in `~/PDFDesk` is used as it is, nothing to export or move. `pdfdesk` 1.1.1 was the last release under the old name.
 
 ---
 
@@ -44,13 +42,13 @@ pip install pdfdesk && pdfdesk
 - ↔️ **Room to read:** hide the sidebar and the notes panel with `[` and `]`.
 - ✏️ **Fix a session** logged by mistake.
 
-Full list in [CHANGELOG.md](https://github.com/shubham10divakar/pdfdesk/blob/main/CHANGELOG.md).
+Full list in [CHANGELOG.md](https://github.com/shubham10divakar/studydesk/blob/main/CHANGELOG.md).
 
-## Why PDFDesk
+## Why StudyDesk
 
 You read dozens of papers a month. A file manager tells you **where** a PDF lives. An annotation tool tells you **what** you marked. Neither tells you **how you read it**: when you opened it, how far you got, how long you actually spent, and what you concluded at the end of each sitting.
 
-PDFDesk keeps that record for you. Every paper moves through a reading lifecycle, every sitting becomes a session, and every highlight and note links back to the page it came from. Months later you can see what you read and why it mattered.
+StudyDesk keeps that record for you. Every paper moves through a reading lifecycle, every sitting becomes a session, and every highlight and note links back to the page it came from. Months later you can see what you read and why it mattered.
 
 <table>
 <tr>
@@ -79,7 +77,7 @@ Sessions, a reading calendar, streaks and a daily revision queue bring papers ba
 
 ## Read with highlights that mean something
 
-<img src="https://raw.githubusercontent.com/shubham10divakar/pdfdesk/main/docs/assets/reader-highlights.png" alt="PDFDesk reader with colour-coded highlights and the highlights panel" width="100%">
+<img src="https://raw.githubusercontent.com/shubham10divakar/studydesk/main/docs/assets/reader-highlights.png" alt="StudyDesk reader with colour-coded highlights and the highlights panel" width="100%">
 
 Select text on any page and pick a colour. Each colour has one job, so a page of highlights reads at a glance:
 
@@ -101,7 +99,7 @@ Select text on any page and pick a colour. Each colour has one job, so a page of
 
 ## Notes that point back to the page
 
-<img src="https://raw.githubusercontent.com/shubham10divakar/pdfdesk/main/docs/assets/reader-notes.png" alt="PDFDesk notes panel with Markdown and page links next to the PDF" width="100%">
+<img src="https://raw.githubusercontent.com/shubham10divakar/studydesk/main/docs/assets/reader-notes.png" alt="StudyDesk notes panel with Markdown and page links next to the PDF" width="100%">
 
 - Write in **Markdown**: headings, bullets, quotes.
 - Type `p. 12` anywhere and it becomes a link to page 12. When the line quotes one of your highlights, the link takes you to that exact highlight.
@@ -112,13 +110,13 @@ Select text on any page and pick a colour. Each colour has one job, so a page of
 
 ## A library that follows your reading
 
-<img src="https://raw.githubusercontent.com/shubham10divakar/pdfdesk/main/docs/assets/library.png" alt="PDFDesk library with status, progress, last read and tags for each paper" width="100%">
+<img src="https://raw.githubusercontent.com/shubham10divakar/studydesk/main/docs/assets/library.png" alt="StudyDesk library with status, progress, last read and tags for each paper" width="100%">
 
 Every paper has a place in the reading lifecycle:
 
 **Inbox → Planned → Reading → Paused → Completed → Revisit**
 
-- Opening a paper moves it to *Reading*. When you reach the last page, PDFDesk asks whether it's *Completed* or worth a *Revisit*. Papers saved as a link stay where you put them until you attach the PDF.
+- Opening a paper moves it to *Reading*. When you reach the last page, StudyDesk asks whether it's *Completed* or worth a *Revisit*. Papers saved as a link stay where you put them until you attach the PDF.
 - **Import** by button or drag and drop. Title, authors and page count come from the PDF itself.
 - **Search everything** from the sidebar: titles, authors, tags and abstracts, and inside your highlights, comments, notes and session takeaways. Each result opens the right page.
 - **Add by arXiv ID or DOI:** paste `1706.03762` or a DOI, and the title, authors, year and venue are filled in. arXiv papers come with their PDF.
@@ -129,7 +127,7 @@ Every paper has a place in the reading lifecycle:
 
 ## Every session, recorded
 
-PDFDesk logs each sitting with a paper on its own:
+StudyDesk logs each sitting with a paper on its own:
 
 - **Active time only.** The clock pauses when the tab is hidden or you've been idle for 3 minutes, so your stats count reading, not open tabs.
 - **Pages covered**: the first and last page you reached.
@@ -159,7 +157,7 @@ The overview turns your sessions into a picture of your reading:
 
 ## Easy on the eyes, day and night
 
-<img src="https://raw.githubusercontent.com/shubham10divakar/pdfdesk/main/docs/assets/reader-dark.png" alt="PDFDesk reader in dark mode" width="100%">
+<img src="https://raw.githubusercontent.com/shubham10divakar/studydesk/main/docs/assets/reader-dark.png" alt="StudyDesk reader in dark mode" width="100%">
 
 Dark mode follows your system setting. Typography is set for long reading sessions: Source Serif 4 for titles and notes, IBM Plex Sans for the interface, IBM Plex Mono for numbers and page references.
 
@@ -189,39 +187,39 @@ Dark mode follows your system setting. Typography is set for long reading sessio
 ## Get started
 
 ```bash
-pip install pdfdesk
-pdfdesk
+pip install studydesk
+studydesk
 ```
 
-PDFDesk opens in your browser at **http://localhost:5173**. A few example papers are loaded so you can explore. Remove them from the sidebar when you're ready, then drop in your own PDFs, add papers by arXiv ID or DOI, or save one by its link when you can't get the PDF.
+StudyDesk opens in your browser at **http://localhost:5173**. A few example papers are loaded so you can explore. Remove them from the sidebar when you're ready, then drop in your own PDFs, add papers by arXiv ID or DOI, or save one by its link when you can't get the PDF.
 
 ```bash
-pdfdesk --no-browser            # start without opening a browser window
-pdfdesk --port 8080             # use another port (same library)
-pdfdesk --data-dir D:\Papers    # keep the library somewhere else
-pdfdesk --version
+studydesk --no-browser            # start without opening a browser window
+studydesk --port 8080             # use another port (same library)
+studydesk --data-dir D:\Papers    # keep the library somewhere else
+studydesk --version
 ```
 
-Upgrade any time with `pip install -U pdfdesk`.
+Upgrade any time with `pip install -U studydesk`.
 
-> **Where your library lives:** in a folder called `PDFDesk` in your home folder (`pdfdesk` prints the exact path; click it in the sidebar or on the About page to open the folder). It holds `library.json`, your PDFs in `pdfs/`, and daily backups in `backups/`. Adding a PDF saves a copy there; your original file stays where it is. Uninstalling the package doesn't touch the folder. Use **Export library** to move it to another computer.
+> **Where your library lives:** in a folder called `StudyDesk` in your home folder (`studydesk` prints the exact path; click it in the sidebar or on the About page to open the folder). It holds `library.json`, your PDFs in `pdfs/`, and daily backups in `backups/`. Adding a PDF saves a copy there; your original file stays where it is. Uninstalling the package doesn't touch the folder. Use **Export library** to move it to another computer.
 
 ## What's coming
 
-PDFDesk is at **1.1**. Next up:
+StudyDesk is at **1.1**. Next up:
 
 - **Recolour instead of duplicate:** highlighting text that's already highlighted will offer to change its colour.
 - **Reference preview:** hover over a citation to read the reference without jumping.
-- **PDFDesk 2.0** as a native desktop app (Tauri + SQLite), installed the same way, with `pip install -U pdfdesk`.
+- **StudyDesk 2.0** as a native desktop app (Tauri + SQLite), installed the same way, with `pip install -U studydesk`.
 - Later: links between papers, spaced revision, weekly reading reports, Zotero import.
 
-The full plan is in [docs/roadmap.md](https://github.com/shubham10divakar/pdfdesk/blob/main/docs/roadmap.md).
+The full plan is in [docs/roadmap.md](https://github.com/shubham10divakar/studydesk/blob/main/docs/roadmap.md).
 
 ## Feedback and contact
 
-PDFDesk is built by **Subham Divakar**, a software engineer and ML researcher. I built it for myself: I read a lot of papers and kept losing track of what I'd read, how far I got and why it mattered. So I built a tool for complete note-making across PDFs and slide decks. I've made notes in it every day for over two years. People who saw it loved it, so here it is: a small version of that tool. More features are on the way.
+StudyDesk is built by **Subham Divakar**, a software engineer and ML researcher. I built it for myself: I read a lot of papers and kept losing track of what I'd read, how far I got and why it mattered. So I built a tool for complete note-making across PDFs and slide decks. I've made notes in it every day for over two years. People who saw it loved it, so here it is: a small version of that tool. More features are on the way.
 
-Found a bug, want a feature, or have a question? Open an [issue](https://github.com/shubham10divakar/pdfdesk/issues) or reach out:
+Found a bug, want a feature, or have a question? Open an [issue](https://github.com/shubham10divakar/studydesk/issues) or reach out:
 
 [Website](https://subhamdivakar.com/) · [LinkedIn](https://www.linkedin.com/in/subham-divakar-a7420a12a/) · [Google Scholar](https://scholar.google.com/citations?user=44ecZj0AAAAJ&hl=en) · [GitHub](https://github.com/shubham10divakar) · [PyPI](https://pypi.org/user/shubham10divakar/)
 
@@ -229,11 +227,11 @@ The **About** page inside the app has the same links.
 
 ## Contributing
 
-Bug reports and ideas are welcome in [Issues](https://github.com/shubham10divakar/pdfdesk/issues). To work on the code, start with [DEVELOPMENT.md](https://github.com/shubham10divakar/pdfdesk/blob/main/DEVELOPMENT.md).
+Bug reports and ideas are welcome in [Issues](https://github.com/shubham10divakar/studydesk/issues). To work on the code, start with [DEVELOPMENT.md](https://github.com/shubham10divakar/studydesk/blob/main/DEVELOPMENT.md).
 
 ## License
 
-[MIT](https://github.com/shubham10divakar/pdfdesk/blob/main/LICENSE). Bundled third-party code keeps its own licence: [PDF.js](https://mozilla.github.io/pdf.js/) (Apache-2.0) and the Source Serif 4, IBM Plex Sans and IBM Plex Mono fonts (SIL Open Font License 1.1).
+[MIT](https://github.com/shubham10divakar/studydesk/blob/main/LICENSE). Bundled third-party code keeps its own licence: [PDF.js](https://mozilla.github.io/pdf.js/) (Apache-2.0) and the Source Serif 4, IBM Plex Sans and IBM Plex Mono fonts (SIL Open Font License 1.1).
 
 <div align="center">
 <br>

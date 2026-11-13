@@ -10,9 +10,9 @@ import threading
 import unittest
 from pathlib import Path
 
-from pdfdesk import lookup
-from pdfdesk.cli import Handler, Server, static_dir
-from pdfdesk.store import Store
+from studydesk import lookup
+from studydesk.cli import Handler, Server, static_dir
+from studydesk.store import Store
 
 ATOM = """<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">

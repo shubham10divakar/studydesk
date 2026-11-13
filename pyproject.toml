@@ -3,7 +3,7 @@ requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pdfdesk"
+name = "studydesk"
 dynamic = ["version"]
 description = "A local-first workspace for reading research papers: PDF reader, highlights, notes, search and a history of your reading."
 readme = "README.md"
@@ -23,23 +23,23 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/shubham10divakar/pdfdesk"
-Source = "https://github.com/shubham10divakar/pdfdesk"
-Issues = "https://github.com/shubham10divakar/pdfdesk/issues"
-Roadmap = "https://github.com/shubham10divakar/pdfdesk/blob/main/docs/roadmap.md"
+Homepage = "https://github.com/shubham10divakar/studydesk"
+Source = "https://github.com/shubham10divakar/studydesk"
+Issues = "https://github.com/shubham10divakar/studydesk/issues"
+Roadmap = "https://github.com/shubham10divakar/studydesk/blob/main/docs/roadmap.md"
 
 [project.scripts]
-pdfdesk = "pdfdesk.cli:main"
+studydesk = "studydesk.cli:main"
 
 [tool.hatch.version]
-path = "pdfdesk/__init__.py"
+path = "studydesk/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["pdfdesk"]
+packages = ["studydesk"]
 
-# The browser app stays in prototype/ (no build step there); the wheel carries a copy as pdfdesk/static/.
+# The browser app stays in prototype/ (no build step there); the wheel carries a copy as studydesk/static/.
 [tool.hatch.build.targets.wheel.force-include]
-"prototype" = "pdfdesk/static"
+"prototype" = "studydesk/static"
 
 [tool.hatch.build.targets.sdist]
-include = ["pdfdesk", "prototype", "README.md", "LICENSE", "pyproject.toml"]
+include = ["studydesk", "prototype", "README.md", "LICENSE", "pyproject.toml"]

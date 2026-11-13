@@ -1,4 +1,4 @@
-"""`pdfdesk` command: serve the bundled browser app on localhost and open it."""
+"""`studydesk` command: serve the bundled browser app on localhost and open it."""
 
 from __future__ import annotations
 
@@ -17,12 +17,12 @@ import webbrowser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-from pdfdesk import __version__, lookup
-from pdfdesk.store import Conflict, Store, default_dir
+from studydesk import __version__, lookup
+from studydesk.store import Conflict, Store, default_dir
 
 DEFAULT_PORT = 5173
 AUTHOR = "Subham Divakar"
-ISSUES = "https://github.com/shubham10divakar/pdfdesk/issues"
+ISSUES = "https://github.com/shubham10divakar/studydesk/issues"
 MAX_LIBRARY = 256 << 20   # 256 MB of JSON
 MAX_PDF = 2 << 30         # 2 GB per PDF
 
@@ -67,7 +67,7 @@ def static_dir() -> Path:
     checkout = Path(__file__).parent.parent / "prototype"
     if (checkout / "index.html").is_file():
         return checkout
-    raise SystemExit("pdfdesk: app files are missing from this install. Reinstall with `pip install --force-reinstall pdfdesk`.")
+    raise SystemExit("studydesk: app files are missing from this install. Reinstall with `pip install --force-reinstall studydesk`.")
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -129,7 +129,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return super().do_GET()
         store: Store = self.server.store  # type: ignore[attr-defined]
         if parts == ["info"]:
-            return self._json(200, {"app": "pdfdesk", "version": __version__, "dataDir": str(store.root), "rev": store.rev(), "platform": sys.platform})
+            return self._json(200, {"app": "studydesk", "version": __version__, "dataDir": str(store.root), "rev": store.rev(), "platform": sys.platform})
         if parts == ["library"]:
             rev, papers = store.read()
             return self._json(200, {"rev": rev, "papers": papers})
@@ -262,21 +262,21 @@ class Server(http.server.ThreadingHTTPServer):
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="pdfdesk",
-        description="Start PDFDesk on this computer and open it in your browser.",
+        prog="studydesk",
+        description="Start StudyDesk on this computer and open it in your browser.",
     )
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"port to serve on (default {DEFAULT_PORT})")
     parser.add_argument("--data-dir", type=Path, default=None,
-                        help="folder for your library (default: $PDFDESK_DATA, or PDFDesk in your home folder)")
+                        help="folder for your library (default: $STUDYDESK_DATA, or StudyDesk in your home folder; an existing PDFDesk folder is used as it is)")
     parser.add_argument("--no-browser", action="store_true", help="don't open a browser window")
     parser.add_argument("--verbose", action="store_true", help="log every request")
-    parser.add_argument("--version", action="version", version=f"pdfdesk {__version__}")
+    parser.add_argument("--version", action="version", version=f"studydesk {__version__}")
     args = parser.parse_args(argv)
 
     try:
         store = Store(args.data_dir or default_dir())
     except OSError as e:
-        print(f"pdfdesk: can't use {args.data_dir or default_dir()} as the library folder: {e.strerror or e}", file=sys.stderr)
+        print(f"studydesk: can't use {args.data_dir or default_dir()} as the library folder: {e.strerror or e}", file=sys.stderr)
         return 1
     handler = functools.partial(Handler, directory=str(static_dir()))
     try:
@@ -284,8 +284,8 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as e:
         if e.errno in (errno.EADDRINUSE, errno.EACCES) or getattr(e, "winerror", None) in (10048, 10013):
             print(
-                f"pdfdesk: port {args.port} is already in use. PDFDesk may already be running at http://localhost:{args.port}\n"
-                "Open that address, or start on another port: pdfdesk --port <number>\n"
+                f"studydesk: port {args.port} is already in use. StudyDesk may already be running at http://localhost:{args.port}\n"
+                "Open that address, or start on another port: studydesk --port <number>\n"
                 f"(This command would use the library folder {store.root}; the server already running may use a different one.)",
                 file=sys.stderr,
             )
@@ -297,7 +297,7 @@ def main(argv: list[str] | None = None) -> int:
     server.allowed_origins = {f"http://{h}" for h in server.allowed_hosts}  # type: ignore[attr-defined]
 
     url = f"http://localhost:{args.port}/"
-    print(f"PDFDesk {__version__} running at {url}  (Ctrl+C to stop)")
+    print(f"StudyDesk {__version__} running at {url}  (Ctrl+C to stop)")
     print(f"Library folder: {store.root}", flush=True)
     say(f"Built by {AUTHOR} with ♥", f"Built by {AUTHOR} with <3")
     print(f"Feedback and questions: {ISSUES}", flush=True)

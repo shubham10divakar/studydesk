@@ -1,5 +1,5 @@
 // Adding papers by arXiv id or DOI, end to end. NEEDS INTERNET: talks to the real arXiv and Crossref.
-// Starts its own pdfdesk (throwaway folder) and static server. From the repo root:
+// Starts its own studydesk (throwaway folder) and static server. From the repo root:
 //   node scripts/e2e/add-by-id.mjs <chromeDebugPort> <abs empty work dir>
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -11,7 +11,7 @@ rmSync(work, { recursive: true, force: true }); mkdirSync(work, { recursive: tru
 const D = join(work, "lib"), procs = [];
 const serve = (args, cmd = "python") => { const p = spawn(cmd, args, { stdio: "ignore" }); procs.push(p); return p; };
 const up = async port => { for (let i = 0; i < 60; i++) { try { await fetch(`http://localhost:${port}/`); return; } catch { await wait(150); } } throw new Error("no server on " + port); };
-serve(["-m", "pdfdesk", "--no-browser", "--port", "5201", "--data-dir", D]); serve(["scripts/serve.mjs", "5202"], process.execPath);
+serve(["-m", "studydesk", "--no-browser", "--port", "5201", "--data-dir", D]); serve(["scripts/serve.mjs", "5202"], process.execPath);
 await up(5201); await up(5202);
 
 const list = await (await fetch(`http://127.0.0.1:${dport}/json/list`)).json();
@@ -70,10 +70,10 @@ try {
   check(/arXiv has no paper 9999\.99999/.test(st), `an unknown arXiv id says so: "${st}"`);
   await click('[data-act="modal-close"]'); await wait(200);
 
-  // ---------- without the pdfdesk server ----------
+  // ---------- without the studydesk server ----------
   await cdp("Page.navigate", { url: "http://localhost:5202/" }); await wait(1800);
   await click('[data-act="add-id"]'); await wait(200);
-  check(!(await js(`!!document.querySelector('#idIn')`)) && /needs PDFDesk started with the/.test(await js(`document.querySelector('.mdl').textContent`)), "on a plain static server, the dialog explains it needs the pdfdesk command");
+  check(!(await js(`!!document.querySelector('#idIn')`)) && /needs StudyDesk started with the/.test(await js(`document.querySelector('.mdl').textContent`)), "on a plain static server, the dialog explains it needs the studydesk command");
 } catch (e) { console.log("ERROR", e.message); fails++; }
 finally { for (const p of procs) try { p.kill(); } catch {} }
 console.log(fails ? `\n${fails} FAILED` : "\nALL PASSED");

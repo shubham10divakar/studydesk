@@ -10,8 +10,8 @@ import threading
 import unittest
 from pathlib import Path
 
-from pdfdesk.cli import Handler, Server, static_dir
-from pdfdesk.store import Store
+from studydesk.cli import Handler, Server, static_dir
+from studydesk.store import Store
 
 
 class ApiTest(unittest.TestCase):
@@ -51,7 +51,7 @@ class ApiTest(unittest.TestCase):
     def test_empty_folder(self):
         st, info = self.j("GET", "/api/info")
         self.assertEqual(st, 200)
-        self.assertEqual(info["app"], "pdfdesk")
+        self.assertEqual(info["app"], "studydesk")
         self.assertEqual(info["rev"], "0")
         self.assertEqual(Path(info["dataDir"]), self.store.root)
         self.assertEqual(self.j("GET", "/api/library"), (200, {"rev": "0", "papers": None}))
@@ -105,7 +105,7 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(self.req("GET", "/api/info", headers={"Origin": f"http://127.0.0.1:{self.port}"}, host=f"127.0.0.1:{self.port}")[0], 200)
 
     def test_open_folder(self):
-        import pdfdesk.cli as cli
+        import studydesk.cli as cli
         opened = []
         real, cli.open_folder = cli.open_folder, opened.append
         try:
@@ -124,10 +124,10 @@ class ApiTest(unittest.TestCase):
     def test_static_app_still_served(self):
         st, body = self.req("GET", "/")
         self.assertEqual(st, 200)
-        self.assertIn(b"PDFDesk", body)
+        self.assertIn(b"StudyDesk", body)
 
     def test_two_processes_share_a_folder(self):
-        # a second Store on the same folder (another pdfdesk on another port) sees the first one's writes
+        # a second Store on the same folder (another studydesk on another port) sees the first one's writes
         other = Store(self.store.root)
         rev = other.write("0", [{"id": "z9", "title": "From port B"}])
         self.assertEqual(self.j("GET", "/api/library")[1], {"rev": rev, "papers": [{"id": "z9", "title": "From port B"}]})

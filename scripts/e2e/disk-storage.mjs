@@ -1,5 +1,5 @@
 // End-to-end test of the library on disk (docs/disk-storage.md), in headless Chrome over CDP.
-// Starts its own servers: two pdfdesk processes sharing one folder, plus the static dev server for migration.
+// Starts its own servers: two studydesk processes sharing one folder, plus the static dev server for migration.
 // Usage (from the repo root): node scripts/e2e/disk-storage.mjs <chromeDebugPort> <samplePdf> <workDir>
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -18,8 +18,8 @@ const find = (lib, re) => lib.papers.find(p => re.test(p.title));
 // ---------- servers ----------
 const procs = [];
 function serve(kind, port, dataDir){
-  const args = kind === "pdfdesk" ? ["-m", "pdfdesk", "--no-browser", "--port", String(port), "--data-dir", dataDir] : ["scripts/serve.mjs", String(port)];
-  const p = spawn(kind === "pdfdesk" ? "python" : process.execPath, args, { stdio: "ignore" });
+  const args = kind === "studydesk" ? ["-m", "studydesk", "--no-browser", "--port", String(port), "--data-dir", dataDir] : ["scripts/serve.mjs", String(port)];
+  const p = spawn(kind === "studydesk" ? "python" : process.execPath, args, { stdio: "ignore" });
   procs.push(p); return p;
 }
 async function up(port){ for (let i = 0; i < 60; i++){ try { await fetch(`http://localhost:${port}/`); return; } catch { await wait(150); } } throw new Error("server on " + port + " did not start"); }
@@ -60,7 +60,7 @@ try {
   const pdfBytes = readFileSync(pdf);
 
   // ---------- 1. a fresh folder ----------
-  const A = serve("pdfdesk", 5194, D), B = serve("pdfdesk", 5195, D);
+  const A = serve("studydesk", 5194, D), B = serve("studydesk", 5195, D);
   await up(5194); await up(5195);
   const P1 = await profile("P1");
   await P1.go("http://localhost:5194/"); await settle();
@@ -107,9 +107,9 @@ try {
   // ---------- 5. server stopped while open ----------
   await stop(B);
   await P2.open(/BERT/); await P2.tag("while-down"); await P2.home(); await wait(1200);
-  check(!(await P2.js(`document.querySelector('#netbar').hidden`)), "when pdfdesk stops, the page says changes aren't being saved");
-  const B2 = serve("pdfdesk", 5195, D); await up(5195); await wait(5000);
-  check(await P2.js(`document.querySelector('#netbar').hidden`) && find(readLib(D), /BERT/).tags.includes("while-down"), "when pdfdesk is back, the page saves and the warning clears");
+  check(!(await P2.js(`document.querySelector('#netbar').hidden`)), "when studydesk stops, the page says changes aren't being saved");
+  const B2 = serve("studydesk", 5195, D); await up(5195); await wait(5000);
+  check(await P2.js(`document.querySelector('#netbar').hidden`) && find(readLib(D), /BERT/).tags.includes("while-down"), "when studydesk is back, the page saves and the warning clears");
 
   // ---------- 6. moving a 0.1.x browser library into an empty folder ----------
   const S1 = serve("static", 5196); await up(5196);
@@ -118,7 +118,7 @@ try {
   check((await P3.js(`document.querySelector('.side-foot').textContent`)).includes("stay in this browser"), "static server still uses browser storage");
   await P3.setFile("#fileIn", pdf); await wait(2500); await P3.open(/Reading Logs/); await P3.note("Written in the browser library."); await P3.home(); await wait(900);
   await stop(S1);
-  const C = serve("pdfdesk", 5196, E); await up(5196);
+  const C = serve("studydesk", 5196, E); await up(5196);
   await P3.go("http://localhost:5196/"); await wait(1500);
   check(/Moved your library \(1 paper\)/.test(await P3.toast()), `first run moves the browser library in: "${await P3.toast()}"`);
   const libE = readLib(E), moved = find(libE, /Reading Logs/);
@@ -132,7 +132,7 @@ try {
   await P4.setFile("#fileIn", pdf); await wait(2500); await P4.open(/Reading Logs/); await P4.note("From the 5197 browser library."); await P4.home(); await wait(900);
   await stop(S2);
   const before = readLib(D).papers.length;
-  const C2 = serve("pdfdesk", 5197, D); await up(5197);
+  const C2 = serve("studydesk", 5197, D); await up(5197);
   await P4.go("http://localhost:5197/"); await wait(1200);
   check(!(await P4.js(`document.querySelector('#leftbar').hidden`)) && /1<\/b> paper/.test(await P4.js(`document.querySelector('#leftbar').innerHTML`)), "folder already has a library: banner offers to add this browser's paper");
   await P4.click('[data-act="left-add"]'); await settle();
