@@ -145,6 +145,7 @@ The overview turns your sessions into a picture of your reading:
 - **Continue reading**: papers in progress, with a progress bar and a one-click resume.
 - **Reading calendar**: a 17-week heatmap of your reading days, with your current streak and total hours.
 - **Up next**: planned and paused papers, sorted by target date.
+- **Coming up** and **Projects**, once you use the trackers: the next five dates, and your active projects with their latest update.
 - **Revision queue**: highlights from finished papers come back each day, so ideas don't fade.
 - **Reading log**: every session, newest first.
 
@@ -176,6 +177,10 @@ A *Projects* section for everything you're working on: research, software, open 
 - **Aim each one:** in a submission's form, pick a 1st, 2nd and 3rd choice paper. Each paper then lists where it's aimed, and each submission says who it's for.
 - **Record what went in:** *Mark as submitted* takes the 1st choice (change it in the form), moves that paper to *Submitted*, and the paper shows where it was submitted and how that stands.
 - Filter submissions by one of your papers to see every place it could go.
+
+## Every date in one place
+
+*Upcoming* lists every date across the trackers, nearest first: submission and abstract deadlines, zero-APC last dates, notifications, camera-ready dates, conference starts, project milestones and next steps, and your papers' target dates. It's grouped as *Overdue*, *This week*, *Next 30 days* and *Later*, and the sidebar shows how many are due within a week. The Overview adds *Coming up* (the next five) and your active projects with their latest update.
 
 Submissions, projects and your papers are saved in `tracker.json` in your library folder (draft PDFs in `pdfs/`). *Export library* doesn't include them yet.
 

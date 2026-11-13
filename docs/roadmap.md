@@ -34,7 +34,7 @@ Planned (spec and open questions: [trackers.md](trackers.md)):
 - [ ] **Submissions tracker** (built): journals, special issues, book chapters and conferences you could submit to, in your own priority-ordered lists, with deadlines (AoE), APC and zero-APC dates, Scopus or not, status and "mark as submitted"
 - [x] **Projects tracker**: what you're working on, its status, a dated update log (the latest shows on the card), next step, milestones, GitHub and other links; stale projects marked
 - [x] **My papers**: your own manuscripts, linked to their 1st/2nd/3rd choice submissions and their project
-- [ ] **Upcoming**: every deadline and milestone across the trackers, nearest first, also on Overview
+- [x] **Upcoming**: every deadline and milestone across the trackers, nearest first, also on Overview
 
 ## Distribution: pip (`studydesk`)
 See decisions.md D-008. One package name and one command across both stacks.

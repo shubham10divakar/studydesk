@@ -273,6 +273,43 @@ try {
   const after = await disk();
   check(after.myPapers.length === 1 && JSON.stringify(after.submissions.find(x => /Chapter/.test(x.title)).targets) === JSON.stringify([survey.id, null, null]), "deleting a paper clears it from submissions' choices and keeps the others");
 
+  // ---------- upcoming, and the overview cards ----------
+  {
+    const cur = await (await fetch(app + "api/tracker")).json(), T = cur.tracker, wl = T.lists.find(l => l.section === "submissions");
+    const sub = (id, o) => ({ id, list: wl.id, kind: "journal", title: id, url: "https://example.org/" + id, topics: [], indexing: "unknown", status: "considering", addedAt: Date.now(), updatedAt: Date.now(), ...o });
+    T.submissions.push(
+      sub("Open journal", { deadline: { date: iso(4) }, zeroApcUntil: iso(40) }),
+      sub("Open conf", { kind: "conference", deadline: { date: iso(20) }, conf: { abstract: iso(12), from: iso(90), place: "Kyoto" } }),
+      sub("Sent conf", { kind: "conference", status: "review", deadline: { date: iso(-5) }, submitted: { date: iso(-6), paper: null }, conf: { notification: iso(8) } }),
+      sub("Closed call", { deadline: { date: iso(-3) } }),
+      sub("Free journal", { apc: { free: true }, zeroApcUntil: iso(5) }));
+    T.lists.find(l => l.id === wl.id).order.push("Open journal", "Open conf", "Sent conf", "Closed call", "Free journal");
+    const th = T.projects.find(p => p.id === "oldproj01");
+    th.milestones = [{ id: "m-late", title: "Send draft to supervisor", due: iso(-2), done: false }, { id: "m-done", title: "Outline", due: iso(1), done: true }];
+    T.myPapers.push({ id: "mp-bench2", title: "Benchmark 2", status: "drafting", targetDate: iso(25), addedAt: Date.now() });
+    check((await fetch(app + "api/tracker", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baseRev: cur.rev, tracker: T }) })).ok, "(dated entries written to the tracker)");
+  }
+  await A.js(`window.dispatchEvent(new Event("focus"))`); await wait(900);
+  check(await A.js(`document.querySelector('[data-act="upcoming"] .ct')?.textContent`) === "2", "the sidebar's Upcoming count is what's overdue or due within 7 days (2)");
+  await A.click(btn("upcoming"));
+  const groups = await A.js(`Object.fromEntries([...document.querySelectorAll('.wrap > .sec')].map(s => [s.querySelector('h2').textContent, [...s.querySelectorAll('.up-i')].map(i => i.querySelector('.up-w').textContent + ": " + i.querySelector('.up-t').textContent)]))`);
+  check(JSON.stringify(groups.Overdue) === JSON.stringify(["Milestone: Send draft to supervisor (Thesis chapter 3)"]), `Overdue: an unfinished milestone past its date (${groups.Overdue})`);
+  check(JSON.stringify(groups["This week"]) === JSON.stringify(["Submission deadline: Open journal"]), `This week: the deadline 4 days away (${groups["This week"]})`);
+  check(JSON.stringify(groups["Next 30 days"]) === JSON.stringify(["Notification: Sent conf", "Abstract deadline: Open conf", "Paper deadline: Open conf", "Paper target: Benchmark 2"]), `Next 30 days, in date order (${groups["Next 30 days"]})`);
+  check(JSON.stringify(groups.Later) === JSON.stringify(["Free to publish until: Open journal", "Conference starts: Open conf, Kyoto"]), `Later (${groups.Later})`);
+  const allT = JSON.stringify(groups);
+  check(!/Closed call|Outline|Free journal|deadline: Sent conf/.test(allT), "left out: closed deadlines, a submitted paper's own deadline, done milestones, and zero-APC dates for calls with no APC");
+  check(/2 days overdue/.test(await A.js(`document.querySelector('.up-n.over').textContent`)), "overdue items say by how much");
+  await A.shot("tk-upcoming");
+  await A.click(byText(".up-i", "/Abstract deadline/"));
+  check(await A.js(`document.querySelector('#sfTitle')?.value`) === "Open conf", "clicking a date opens that entry");
+  await A.click(btn("modal-close"));
+  await A.click(btn("home"));
+  const home = await A.js(`[...document.querySelectorAll('.sec h2')].map(h => h.textContent)`);
+  check(home.includes("Coming up") && home.includes("Projects"), "the overview gets Coming up and Projects");
+  check(await A.js(`[...document.querySelectorAll('.sec')].find(s => /Coming up/.test(s.textContent)).querySelectorAll('.up-i').length`) === 5 && /Thesis chapter 3/.test(await A.js(`[...document.querySelectorAll('.sec')].find(s => s.querySelector('h2')?.textContent === "Projects").textContent`)), "Coming up shows the next 5; Projects shows the active one with its stale marker");
+  await A.shot("tk-overview");
+
   await A.cdp("Page.reload"); await wait(2000);
   check(await A.js(`document.querySelector('.tk-nav').innerText.includes("Where to submit")`), "after a reload the sidebar still lists it");
   check(!A.errs.length && !B.errs.length, `no script errors (${[...A.errs, ...B.errs].join(" | ")})`);

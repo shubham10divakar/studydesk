@@ -332,6 +332,7 @@ function renderSide(){
     <input class="search" id="q" type="search" placeholder="Search papers and notes" value="${esc(S.ui.q)}" aria-label="Search papers">
     <nav class="nav">
       <button class="nav-i ${S.ui.view==="home"?"on":""}" data-act="home">Overview</button>
+      ${TK.submissions.length || TK.projects.length || TK.myPapers.length ? (n => `<button class="nav-i ${S.ui.view==="upcoming"?"on":""}" data-act="upcoming" title="Dates in the next 7 days, and overdue">Upcoming${n ? `<span class="ct up-ct">${n}</span>` : ""}</button>`)(soonCount()) : ""}
       <button class="nav-i ${f==="all"?"on":""}" data-act="filter" data-v="all">All papers <span class="ct">${S.papers.length}</span></button>
       ${nLink ? `<button class="nav-i ${f==="nopdf"?"on":""}" data-act="filter" data-v="nopdf">No PDF yet <span class="ct">${nLink}</span></button>` : ""}
       <button class="nav-i ${S.ui.view==="about"?"on":""}" data-act="about">About</button>
@@ -448,6 +449,7 @@ function homeHTML(){
       <section class="sec"><div class="sec-h"><h2>Up next</h2><span class="meta">planned and paused</span></div>${upHTML}</section>
       <section class="sec"><div class="sec-h"><h2>Revision queue</h2><span class="meta">from finished papers, rotates daily</span></div>${revHTML}</section>
     </div>
+    ${homeTrackersHTML()}
     <section class="sec"><div class="sec-h"><h2>Reading log</h2><span class="meta">${ses.length} sessions recorded</span></div>${logHTML}</section>
   </div>`;
 }
@@ -481,7 +483,7 @@ function libHTML(){
 
 function renderMain(){
   const m = $("#main"); m.classList.remove("is-reader");
-  m.innerHTML = S.ui.view === "library" ? libHTML() : S.ui.view === "about" ? aboutHTML() : S.ui.view === "subs" ? subsHTML() : S.ui.view === "projects" ? projsHTML() : S.ui.view === "project" ? projectHTML() : S.ui.view === "mypapers" ? myPapersHTML() : homeHTML();
+  m.innerHTML = S.ui.view === "library" ? libHTML() : S.ui.view === "about" ? aboutHTML() : S.ui.view === "subs" ? subsHTML() : S.ui.view === "projects" ? projsHTML() : S.ui.view === "project" ? projectHTML() : S.ui.view === "mypapers" ? myPapersHTML() : S.ui.view === "upcoming" ? upcomingHTML() : homeHTML();
   m.scrollTop = 0;
 }
 function renderAll(){ renderSide(); if (S.ui.view === "reader" && R) renderPanel(); else renderMain(); applyLayout(); }
@@ -572,6 +574,10 @@ const FEATURES = [
     "Pick a 1st, 2nd and 3rd choice paper for each submission; each paper lists where it's aimed",
     "Mark as submitted records which paper went in and moves it to Submitted",
     "Filter submissions by one of your papers"]],
+  ["Upcoming", [
+    "Every date across the trackers, nearest first: deadlines, abstract and zero-APC dates, notifications, camera-ready, conference starts, milestones, next steps, paper targets",
+    "Grouped as Overdue, This week, Next 30 days and Later; the sidebar counts what's due within 7 days",
+    "Coming up and your active projects on the Overview"]],
   ["Projects", [
     "Keep what you're working on in your own lists, in priority order",
     "A dated update log: the newest line shows on the card with how long ago it was; status changes are logged too",
@@ -2320,6 +2326,61 @@ function projPapersCard(p){
   </section>`;
 }
 
+/* ---------------- upcoming ---------------- */
+// Every date that matters across the trackers, nearest first. A submission's deadlines count while it's still open;
+// after it goes in, its notification, camera-ready and conference dates take over. Project milestones, next steps and
+// my papers' target dates that have passed stay listed as overdue, since they still need doing; a passed submission
+// deadline doesn't (it has closed, and its row says so).
+function upcomingItems(){
+  const out = [], now = Date.now(), add = (t, what, title, act, v, keepPast) => { if (t != null && (t >= day0() || keepPast)) out.push({t, what, title, act, v, over:t < now}); };
+  for (const x of TK.submissions){
+    const c = x.conf || {}, name = x.title || linkHost(x.url), conf = x.kind === "conference", dead = ["rejected","withdrawn","missed"].includes(x.status);
+    if (isOpen(x)){
+      add(dueAt(x.deadline), conf ? "Paper deadline" : "Submission deadline", name, "sub-edit", x.id);
+      if (conf) add(dayAt(c.abstract), "Abstract deadline", name, "sub-edit", x.id);
+    }
+    if (!dead && !(x.apc && x.apc.free)) add(dayAt(x.zeroApcUntil), "Free to publish until", name, "sub-edit", x.id);
+    if (conf && SENT.has(x.status) && !["accepted","rejected"].includes(x.status)) add(dayAt(c.notification), "Notification", name, "sub-edit", x.id);
+    if (conf && x.status === "accepted") add(dayAt(c.cameraReady), "Camera-ready", name, "sub-edit", x.id);
+    if (conf && !dead) add(dayAt(c.from), "Conference starts", name + (c.place ? `, ${c.place}` : ""), "sub-edit", x.id);
+  }
+  for (const p of TK.projects){
+    if (p.status === "done" || p.status === "dropped") continue;
+    (p.milestones || []).forEach(m => { if (!m.done) add(dayAt(m.due), "Milestone", `${m.title} (${p.name})`, "proj-open", p.id, true); });
+    if (p.next && p.next.text) add(dayAt(p.next.due), "Next step", `${p.next.text} (${p.name})`, "proj-open", p.id, true);
+    add(dayAt(p.targetDate), "Project target", p.name, "proj-open", p.id, true);
+  }
+  for (const m of TK.myPapers) if (!["submitted","review","accepted","published"].includes(m.status)) add(dayAt(m.targetDate), "Paper target", m.title, "mp-edit", m.id, true);
+  return out.sort((a, b) => a.t - b.t);
+}
+const soonCount = () => upcomingItems().filter(i => daysTo(i.t) <= 7).length;
+function upRow(i){
+  const d = daysTo(i.t), when = i.over ? (d === 0 ? "today, passed" : `${-d} ${d === -1 ? "day" : "days"} overdue`) : d === 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`;
+  return `<button class="up-i" data-act="${i.act}" data-v="${i.v}"><span class="up-d num">${fmtDate(i.t)}</span><span class="up-b"><span class="up-w">${esc(i.what)}</span><span class="up-t">${esc(i.title)}</span></span><span class="up-n ${i.over ? "over" : d <= 7 ? "soon" : ""}">${when}</span></button>`;
+}
+function upcomingHTML(){
+  const items = upcomingItems(), groups = [["Overdue", i => i.over], ["This week", i => !i.over && daysTo(i.t) <= 7], ["Next 30 days", i => !i.over && daysTo(i.t) > 7 && daysTo(i.t) <= 30], ["Later", i => daysTo(i.t) > 30]];
+  return `<div class="wrap">
+    <div><div class="eyebrow">Upcoming</div><h1 class="page-h">Upcoming</h1>
+      <p class="sub">Deadlines, zero-APC dates, conference dates, milestones, next steps and paper targets, nearest first.</p></div>
+    ${items.length ? groups.map(([h, f]) => { const g = items.filter(f); return g.length ? `<section class="sec" aria-label="${h}"><div class="sec-h"><h2>${h}</h2><span class="meta">${g.length}</span></div><div class="up-list">${g.map(upRow).join("")}</div></section>` : ""; }).join("")
+      : `<div class="empty">Nothing dated yet. Deadlines from Submissions, milestones and next steps from Projects, and target dates from My papers show up here.</div>`}
+  </div>`;
+}
+// The two Overview cards; left out until the trackers have something in them.
+function homeTrackersHTML(){
+  if (!TK.submissions.length && !TK.projects.length && !TK.myPapers.length) return "";
+  const up = upcomingItems().slice(0, 5);
+  const act = TK.projects.filter(p => ["active","blocked","planning"].includes(p.status)).sort((a, b) => isStale(b) - isStale(a) || lastTouch(b) - lastTouch(a)).slice(0, 5);
+  return `<div class="grid2">
+      <section class="sec"><div class="sec-h"><h2>Coming up</h2><button class="meta path-link" data-act="upcoming">See all</button></div>
+        ${up.length ? `<div class="up-list">${up.map(upRow).join("")}</div>` : `<div class="empty">No dates set. Add deadlines to your submissions or milestones to your projects.</div>`}</section>
+      <section class="sec"><div class="sec-h"><h2>Projects</h2><button class="meta path-link" data-act="tk-projs" data-v="all">All projects</button></div>
+        ${act.length ? `<div class="list">${act.map(p => { const u = (p.updates || [])[0]; return `<button class="li" data-act="proj-open" data-v="${p.id}"><span class="dot" style="--c:var(${(PROJ_STATUS.find(s => s[0] === p.status) || PROJ_STATUS[0])[2]});margin-top:6px"></span><span style="min-width:0"><div class="li-t">${esc(p.name)}</div><div class="li-m">${u ? `${esc(rel(u.at))}: ${esc(updText(u))}` : "No updates yet"}</div></span>${isStale(p) ? `<span class="due soon">no update in ${staleDays(p)}d</span>` : ""}</button>`; }).join("")}</div>`
+          : `<div class="empty">No active projects. Set a project to Active and its latest update shows here.</div>`}</section>
+    </div>`;
+}
+
 /* ---------------- tag picker ---------------- */
 // The tag box suggests tags already in the library: most used first when empty, matches (prefix first) as you type.
 // Enter or comma adds the selected suggestion, or the typed text as a new tag; Backspace in an empty box removes the last tag.
@@ -2485,6 +2546,7 @@ document.addEventListener("click", async e => {
     case "pn-save": { const pp = getProj(S.ui.tkItem); if (pp){ const tx = $("#pnText").value.trim(), du = $("#pnDue").value; pp.next = tx ? {text:tx, due:du} : null; projTouch(pp); toast(tx ? "Next step saved" : "Next step cleared"); } break; }
     case "pm-add": { const pp = getProj(S.ui.tkItem), tx = $("#pmTitle").value.trim(); if (!pp) break; if (!tx){ $("#pmTitle").focus(); break; } (pp.milestones = pp.milestones || []).push({id:uid(), title:tx, due:$("#pmDue").value, done:false}); projTouch(pp); $("#pmTitle")?.focus(); break; }
     case "pm-del": { const pp = getProj(S.ui.tkItem); if (pp){ pp.milestones = (pp.milestones || []).filter(m => m.id !== v); projTouch(pp); } break; }
+    case "upcoming": closeReader(); S.ui.view = "upcoming"; save(); renderAll(); break;
     case "mypapers": closeReader(); S.ui.view = "mypapers"; save(); renderAll(); break;
     case "mp-new": showMPForm(null, v); break;
     case "mp-edit": showMPForm(v); break;
