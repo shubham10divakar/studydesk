@@ -146,7 +146,7 @@ Each step leaves the app working, so building can stop after any of them.
 - [x] 5. My papers (`myPapersHTML`, `showMPForm` / `mpSave`), papers to target and paper submitted in the submission form, filter by paper, the project page's Papers card (its papers, and library papers read for it). A project's own papers are found by each paper's `project` field; `projects[].myPapers` in the shape below is not used
 - [x] 6. Upcoming view (`upcomingItems`, `upcomingHTML`) and the Overview cards (`homeTrackersHTML`). A submission's deadlines count while it's open; once sent, its notification, camera-ready and conference dates take over. Passed milestones, next steps and paper targets stay as Overdue; a passed submission deadline drops out (closed)
 - [x] 7. Images: `/api/image/<id>` (PUT/GET/DELETE; PNG, JPEG, WebP or GIF only, checked by the file's first bytes, 10 MB cap, served with `nosniff`); `images` helper in `app.js` (IndexedDB `img:<id>` in a browser); choose a file or paste a screenshot in the form; each upload gets a new id and the replaced file is deleted
-- [ ] 8. Export / import of the tracker
+- [x] 8. Export / import: the zip carries `tracker.json`, `images/`, drafts in `pdfs/` and a readable `tracker.md`; the backup without PDFs carries the tracker inline. Import merges by id (rules in export-import.md); the dialog counts tracker entries; Replace clears the trackers too (`trackerFiles`, `importTracker`, `clearTracker` in `app.js`)
 - [ ] 9. Docs: README, About `FEATURES`, CHANGELOG, roadmap, architecture, data-model (each step also updates the docs it touches)
 
 Later, if wanted: search across trackers.

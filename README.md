@@ -183,11 +183,11 @@ A *Projects* section for everything you're working on: research, software, open 
 
 *Upcoming* lists every date across the trackers, nearest first: submission and abstract deadlines, zero-APC last dates, notifications, camera-ready dates, conference starts, project milestones and next steps, and your papers' target dates. It's grouped as *Overdue*, *This week*, *Next 30 days* and *Later*, and the sidebar shows how many are due within a week. The Overview adds *Coming up* (the next five) and your active projects with their latest update.
 
-Submissions, projects and your papers are saved in `tracker.json` in your library folder (draft PDFs in `pdfs/`, images in `images/`). *Export library* doesn't include them yet.
+Submissions, projects and your papers are saved in `tracker.json` in your library folder (draft PDFs in `pdfs/`, images in `images/`), and *Export library* includes them.
 
 ## Back up and move your library
 
-- **Export library** saves everything in one `.zip`: your PDFs, highlights, comments, notes, sessions and bookmarks, plus a readable Markdown file for every paper with its link, abstract, notes and highlights.
+- **Export library** saves everything in one `.zip`: your PDFs, highlights, comments, notes, sessions and bookmarks, plus a readable Markdown file for every paper with its link, abstract, notes and highlights. Your submissions, projects and own papers come too, with their images and drafts, and a readable `tracker.md`.
 - **Export without PDFs** makes a small backup file for frequent saves.
 - **Import library** shows what's in the file before changing anything. *Add to my library* merges and never deletes or overwrites what you wrote; *Replace my library* asks first and offers to export your current library.
 - Drop an export file on the window to import it. Use it to move to another browser or computer.

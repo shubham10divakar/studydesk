@@ -592,6 +592,7 @@ const FEATURES = [
     "Export the whole library as one .zip: PDFs, highlights, notes, sessions, plus a readable Markdown file per paper with its link and abstract",
     "A small backup without PDFs for frequent saves",
     "Import merges into your library and never deletes what you wrote, or replaces it after asking",
+    "Submissions, projects and your own papers go along, with their images and drafts, plus a readable tracker.md",
     "Drop an export file on the window to import it"]],
   ["Private and offline", [
     "Your library is a folder on your computer (StudyDesk in your home folder) with real PDF files and daily backups",
@@ -630,7 +631,7 @@ function aboutHTML(){
 
     <section class="data" aria-labelledby="dt-h">
       <div><h2 id="dt-h">Your data</h2>
-      <p>${DISK.on ? `Your library is a folder on this computer: ${folderLink()}. It holds library.json and your PDFs as normal files, with a daily backup. Every browser and port on this computer shows the same library, and adding a PDF never touches your original file. Export to move the library to another computer or keep an extra copy.` : `Your library lives in this browser at this address. Adding a PDF saves a copy here; your original file is never touched. Export to back it up or move it to another browser or computer. Run StudyDesk with the studydesk command to keep the library in a folder on disk instead.`}${S.ui.lastExport ? ` Last export: ${esc(fmtDay(S.ui.lastExport))}.` : " You haven't exported yet."}</p></div>
+      <p>${DISK.on ? `Your library is a folder on this computer: ${folderLink()}. It holds library.json (and tracker.json for submissions and projects) and your PDFs as normal files, with a daily backup. Every browser and port on this computer shows the same library, and adding a PDF never touches your original file. Export to move the library to another computer or keep an extra copy.` : `Your library lives in this browser at this address. Adding a PDF saves a copy here; your original file is never touched. Export to back it up or move it to another browser or computer. Run StudyDesk with the studydesk command to keep the library in a folder on disk instead.`}${S.ui.lastExport ? ` Last export: ${esc(fmtDay(S.ui.lastExport))}.` : " You haven't exported yet."}</p></div>
       <div class="fb-acts">
         <button class="btn primary" data-act="exp">Export library</button>
         <button class="btn" data-act="exp-lite">Export without PDFs</button>
@@ -1151,13 +1152,112 @@ async function zipRead(file, ent){ // -> Blob of the entry's contents
 }
 
 const slug = s => String(s || "paper").toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/[\s_-]+/g, "-").slice(0, 60) || "paper";
+
+// ----- the trackers in an export (docs/export-import.md § Trackers) -----
+// The zip carries tracker.json, images/<id>.<ext> and my papers' drafts as pdfs/<id>.pdf, plus tracker.md for people.
+// A backup without PDFs carries the tracker inline as library.json's "tracker". Older StudyDesk versions ignore both.
+const TRACKER_FORMAT = "studydesk-tracker", TRACKER_VERSION = 1;
+const IMG_EXT = {"image/png":"png", "image/jpeg":"jpg", "image/webp":"webp", "image/gif":"gif"};
+const EXT_IMG = Object.fromEntries(Object.entries(IMG_EXT).map(([t, e]) => [e, t]));
+const tkCount = t => t ? t.submissions.length + t.projects.length + t.myPapers.length : 0;
+function trackerMarkdown(){
+  const out = ["# Submissions, projects and my papers", ""], d = s => isDate(s) ? fmtFull(dayAt(s)) : "";
+  const subLine = (x, i) => {
+    const due = dueAt(x.deadline), bits = [labelOf(SUB_KINDS, x.kind), x.indexing === "scopus" ? "Scopus" : x.indexing === "none" ? "Not Scopus" : "", labelOf(SUB_STATUS, x.status),
+      due ? `deadline ${fmtFull(due)}${x.deadline.time ? " " + x.deadline.time : ""}${x.deadline.aoe ? " AoE" : ""}` : "", fmtMoney(x.apc), x.zeroApcUntil ? `free to publish until ${d(x.zeroApcUntil)}` : "",
+      x.submitted && x.submitted.date ? `submitted ${d(x.submitted.date)}${x.submitted.paper && getMP(x.submitted.paper) ? ` (${getMP(x.submitted.paper).title})` : ""}` : ""].filter(Boolean);
+    const tg = (x.targets || []).map((id, k) => id && getMP(id) ? `${CHOICE[k]}: ${getMP(id).title}` : "").filter(Boolean);
+    return `${i}. **${x.title || linkHost(x.url)}** · ${bits.join(" · ")}\n   ${x.url}${tg.length ? `\n   For ${tg.join(", ")}` : ""}${(x.topics || []).length ? `\n   Topics: ${x.topics.join(", ")}` : ""}${x.details ? `\n   ${plainText(x.details)}` : ""}`;
+  };
+  for (const l of tkLists("submissions")){ const xs = listItems(l); out.push(`## ${l.name}`, "", ...(xs.length ? xs.map((x, i) => subLine(x, i + 1)) : ["_Empty._"]), ""); }
+  out.push("# Projects", "");
+  for (const p of TK.projects){
+    out.push(`## ${p.name} (${labelOf(PROJ_STATUS, p.status)})`, "");
+    if (p.summary) out.push(p.summary, "");
+    const links = [p.github, ...(p.links || []).map(l => `${l.label ? l.label + ": " : ""}${l.url}`)].filter(Boolean);
+    if (links.length) out.push(...links.map(l => `- ${l}`), "");
+    if (p.next && p.next.text) out.push(`Next: ${p.next.text}${p.next.due ? ` (by ${d(p.next.due)})` : ""}`, "");
+    if ((p.milestones || []).length) out.push("Milestones:", ...p.milestones.map(m => `- [${m.done ? "x" : " "}] ${m.title}${m.due ? ` (${d(m.due)})` : ""}`), "");
+    if ((p.updates || []).length) out.push("Updates:", ...p.updates.map(u => `- ${fmtFull(u.at)}: ${updText(u)}`), "");
+    if (p.notes) out.push(p.notes.trim(), "");
+  }
+  out.push("# My papers", "");
+  for (const m of TK.myPapers) out.push(`- **${m.title}** · ${labelOf(MP_STATUS, m.status)}${m.targetDate ? ` · target ${d(m.targetDate)}` : ""}${m.project && getProj(m.project) ? ` · ${getProj(m.project).name}` : ""}`);
+  return out.join("\n") + "\n";
+}
+async function trackerFiles(count){ // the tracker's files for the zip
+  const files = [{name:"tracker.json", data:enc.encode(JSON.stringify({format:TRACKER_FORMAT, formatVersion:TRACKER_VERSION, appVersion:VERSION, exportedAt:new Date().toISOString(), ...TK}, null, 1))}];
+  for (const x of [...TK.submissions, ...TK.projects]) if (hasImg(x)){ const b = await images.get(x.image.id); if (b){ files.push({name:`images/${x.image.id}.${IMG_EXT[x.image.type] || "png"}`, data:new Uint8Array(await b.arrayBuffer())}); count.img++; } }
+  for (const m of TK.myPapers) if (m.hasFile){ const b = await idb.get(m.id); if (b){ files.push({name:`pdfs/${m.id}.pdf`, data:new Uint8Array(await b.arrayBuffer())}); count.drafts++; } }
+  files.push({name:"tracker.md", data:enc.encode(trackerMarkdown())});
+  return files;
+}
+// Import: matched by id. New entries are added; for one you already have, the copy changed more recently wins, and a
+// project keeps every update and milestone from both. Lists keep their entries' order and gain the file's. Nothing of
+// yours is removed. Entries whose list is missing go to a list called Imported.
+async function importTracker(imp){
+  const inc = imp.tracker, res = {added:0, updated:0, failed:0}; if (!inc) return res;
+  const arr = v => Array.isArray(v) ? v : [];
+  for (const l of inc.lists){
+    const cur = getList(l.id);
+    if (!cur) TK.lists.push({...l, order:arr(l.order)});
+    else cur.order = [...new Set([...arr(cur.order), ...arr(l.order)])];
+  }
+  for (const k of ["submissions", "projects", "myPapers"]) for (const x of inc[k]){
+    const cur = TK[k].find(y => y.id === x.id);
+    // An image or draft is taken only when the file has it; otherwise ours (if any) stays.
+    let imgOk = false, draftOk = false;
+    if (k !== "myPapers" && hasImg(x)){
+      const e = imp.images.get(x.image.id);
+      if (e){ try { await images.put(x.image.id, new Blob([await zipRead(imp.file, e.ent)], {type:e.type})); x.image = {id:x.image.id, type:e.type}; imgOk = true; } catch(err){ res.failed++; } }
+    }
+    if (k !== "myPapers" && !imgOk) x.image = null;
+    if (k === "myPapers"){
+      if (imp.drafts.has(x.id) && !(cur && cur.hasFile)){ try { await idb.putStrict(x.id, new Blob([await zipRead(imp.file, imp.zip.get(`pdfs/${x.id}.pdf`))], {type:"application/pdf"})); draftOk = true; } catch(err){ res.failed++; } }
+      x.hasFile = draftOk;
+    }
+    if (!cur){ TK[k].push(x); res.added++; continue; }
+    const hadImg = hasImg(cur) ? cur.image.id : null;
+    if ((x.updatedAt || 0) > (cur.updatedAt || 0)){
+      const keep = {};
+      if (k === "projects"){ keep.updates = cur.updates; keep.milestones = cur.milestones; }
+      if (k !== "myPapers" && !imgOk) keep.image = cur.image || null;
+      if (k === "myPapers") keep.hasFile = !!cur.hasFile || draftOk;
+      Object.assign(cur, x, keep);
+      if (hadImg && imgOk && cur.image.id !== hadImg) images.del(hadImg);
+    } else {
+      if (imgOk && !hadImg) cur.image = x.image;                        // ours had no image: take the file's
+      else if (imgOk && hadImg !== x.image.id) images.del(x.image.id);   // ours wins: drop the unused copy
+      if (draftOk) cur.hasFile = true;
+    }
+    if (k === "projects"){
+      const byId = (a, b) => { const seen = new Set(arr(a).map(y => y.id)); return arr(a).concat(arr(b).filter(y => y && !seen.has(y.id))); };
+      cur.updates = byId(cur.updates, x.updates).sort((a, b) => (b.at || 0) - (a.at || 0));
+      cur.milestones = byId(cur.milestones, x.milestones);
+    }
+    res.updated++;
+  }
+  for (const k of ["submissions", "projects"]) for (const x of TK[k]) if (!getList(x.list)){
+    const sec = k === "projects" ? "projects" : "submissions";
+    const l = tkLists(sec).find(y => y.name === "Imported") || newList(sec, "Imported");
+    x.list = l.id; if (!l.order.includes(x.id)) l.order.push(x.id);
+  }
+  tsave();
+  return res;
+}
+async function clearTracker(){ // Replace my library: the trackers go too, with their images and drafts
+  for (const x of [...TK.submissions, ...TK.projects]) if (hasImg(x)) await images.del(x.image.id);
+  for (const m of TK.myPapers) if (m.hasFile) await idb.del(m.id);
+  TK = emptyTracker();
+}
+
 function paperMarkdown(p){
   const meta = [p.authors, [p.venue, p.year].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
   const hls = [...p.highlights].sort((a, b) => a.page - b.page).map(h => `- p. ${h.page} · ${HLC[h.color] || h.color}: "${h.text}"${h.comment ? `\n  ${h.comment}` : ""}`);
   const src = [p.url && SAFE_URL.test(p.url) ? `Link: ${p.url}` : "", isLink(p) ? "No PDF yet" : ""].filter(Boolean).join(" · ");
   return `# ${p.title}\n\n${meta ? meta + "\n\n" : ""}${src ? src + "\n\n" : ""}Status: ${SLABEL[p.status] || p.status}${p.tags.length ? ` · Tags: ${p.tags.join(", ")}` : ""}\n\n${p.abstract ? `## Abstract\n\n${p.abstract.trim()}\n\n` : ""}## Notes\n\n${p.notes.trim() || "_No notes yet._"}\n\n## Highlights\n\n${hls.join("\n") || "_No highlights yet._"}\n`;
 }
-const exportReadme = n => `StudyDesk library export\n\nlibrary.json  every paper with its status, tags, highlights, notes, sessions and bookmarks\npdfs/         the stored copy of each PDF, named by paper id\nnotes/        one Markdown file per paper, readable in any text editor\n\nTo restore: open StudyDesk, go to About (or the sidebar footer), choose Import library and pick this file.\nPapers: ${n}. Made with StudyDesk ${VERSION}.\n`;
+const exportReadme = n => `StudyDesk library export\n\nlibrary.json  every paper with its status, tags, highlights, notes, sessions and bookmarks\npdfs/         the stored copy of each PDF, named by paper id (and drafts of your own papers)\nnotes/        one Markdown file per paper, readable in any text editor\ntracker.json  submissions, projects and your own papers, when you use them\nimages/       images on submissions and projects\ntracker.md    the same, readable in any text editor\n\nTo restore: open StudyDesk, go to About (or the sidebar footer), choose Import library and pick this file.\nPapers: ${n}. Made with StudyDesk ${VERSION}.\n`;
 
 function download(blob, name){
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
@@ -1165,12 +1265,13 @@ function download(blob, name){
 }
 
 async function exportLibrary(withPdfs, then){
-  const papers = S.papers.filter(p => !p.sample);
-  if (!papers.length){ toast("Your library is empty. Add PDFs first."); return false; }
+  const papers = S.papers.filter(p => !p.sample), nt = tkCount(TK);
+  if (!papers.length && !nt){ toast("Your library is empty. Add PDFs first."); return false; }
   closeReader();
   toast(withPdfs ? "Preparing export…" : "Preparing backup…");
   const stamp = isoDay(Date.now()), lib = {format:EXPORT_FORMAT, formatVersion:EXPORT_VERSION, appVersion:VERSION, exportedAt:new Date().toISOString(), includesPdfs:withPdfs, papers};
-  const count = {pdfs:0, hl:papers.reduce((a, p) => a + p.highlights.length, 0), ses:papers.reduce((a, p) => a + p.sessions.length, 0)};
+  const count = {pdfs:0, img:0, drafts:0, hl:papers.reduce((a, p) => a + p.highlights.length, 0), ses:papers.reduce((a, p) => a + p.sessions.length, 0)};
+  if (nt) lib.tracker = withPdfs ? undefined : JSON.parse(JSON.stringify(TK));
   try {
     if (!withPdfs){ download(new Blob([JSON.stringify(lib, null, 1)], {type:"application/json"}), `studydesk-backup-${stamp}.json`); }
     else {
@@ -1180,13 +1281,14 @@ async function exportLibrary(withPdfs, then){
         let s = slug(p.title), k = 2; while (used.has(s)) s = `${slug(p.title)}-${k++}`; used.add(s);
         files.push({name:`notes/${s}.md`, data:enc.encode(paperMarkdown(p))});
       }
+      if (nt) files.push(...await trackerFiles(count));
       files.push({name:"README.txt", data:enc.encode(exportReadme(papers.length))});
       download(zipBlob(files), `studydesk-export-${stamp}.zip`);
     }
   } catch(err){ toast(`Export failed: ${err.message}`); return false; }
   S.ui.lastExport = Date.now(); save();
   const n = (x, w) => `${x} ${w}${x === 1 ? "" : "s"}`;
-  toast(`Exported ${n(papers.length, "paper")}${withPdfs ? `, ${n(count.pdfs, "PDF")}` : ""}, ${n(count.hl, "highlight")}, ${n(count.ses, "session")}`);
+  toast(`Exported ${n(papers.length, "paper")}${withPdfs ? `, ${n(count.pdfs, "PDF")}` : ""}, ${n(count.hl, "highlight")}, ${n(count.ses, "session")}${nt ? `, ${nt} tracker ${nt === 1 ? "entry" : "entries"}${count.img ? ` with ${n(count.img, "image")}` : ""}` : ""}`);
   if (then) await then();
   return true;
 }
@@ -1216,12 +1318,22 @@ async function readImport(file){
   if (+lib.formatVersion > EXPORT_VERSION) throw new Error("This file was made by a newer StudyDesk. Upgrade with pip install -U studydesk, then import again.");
   const papers = lib.papers.filter(p => p && p.id && !p.sample).map(cleanPaper);
   const pdfIds = new Set(zip ? papers.filter(p => zip.has(`pdfs/${p.id}.pdf`)).map(p => p.id) : []);
-  return {file, zip, papers, pdfIds, exportedAt:lib.exportedAt};
+  let tracker = null;
+  if (zip && zip.has("tracker.json")){
+    let t; try { t = JSON.parse(await (await zipRead(file, zip.get("tracker.json"))).text()); } catch(e){ throw new Error("tracker.json in this zip is damaged."); }
+    if (!t || t.format !== TRACKER_FORMAT) throw new Error("tracker.json in this zip isn't a StudyDesk tracker.");
+    if (+t.formatVersion > TRACKER_VERSION) throw new Error("This file was made by a newer StudyDesk. Upgrade with pip install -U studydesk, then import again.");
+    tracker = cleanTracker(t);
+  } else if (lib.tracker) tracker = cleanTracker(lib.tracker);
+  const imgs = new Map();
+  if (zip) for (const [name, ent] of zip){ const m = /^images\/([A-Za-z0-9_-]{1,64})\.(png|jpg|webp|gif)$/.exec(name); if (m) imgs.set(m[1], {ent, type:EXT_IMG[m[2]]}); }
+  const drafts = new Set(zip && tracker ? tracker.myPapers.filter(m => zip.has(`pdfs/${m.id}.pdf`)).map(m => m.id) : []);
+  return {file, zip, papers, pdfIds, exportedAt:lib.exportedAt, tracker:tkCount(tracker) || (tracker && tracker.lists.length) ? tracker : null, images:imgs, drafts};
 }
 
 async function startImport(file){
   try { IMP = await readImport(file); } catch(err){ IMP = null; toast(err.message); return; }
-  if (!IMP.papers.length){ IMP = null; toast("That export has no papers in it."); return; }
+  if (!IMP.papers.length && !IMP.tracker){ IMP = null; toast("That export has no papers in it."); return; }
   showImportDialog("choose");
 }
 
@@ -1239,13 +1351,14 @@ function showImportDialog(step){
       <li>${n(IMP.papers.length, "paper")}: ${IMP.papers.length - have} new, ${have} already in your library</li>
       <li>${n(IMP.pdfIds.size, "PDF")}${IMP.zip ? "" : " (this backup has no PDFs)"}</li>
       <li>${n(hl, "highlight")} and ${n(ses, "session")}</li>
+      ${IMP.tracker ? (t => `<li>${n(t.submissions.length, "submission")}, ${n(t.projects.length, "project")} and ${n(t.myPapers.length, "paper")} of your own: ${[...t.submissions.filter(x => !getSub(x.id)), ...t.projects.filter(x => !getProj(x.id)), ...t.myPapers.filter(x => !getMP(x.id))].length} new</li>`)(IMP.tracker) : ""}
     </ul>
     <div class="mdl-opt"><button class="btn primary" data-act="imp-add">Add to my library</button><span>Adds new papers and merges the rest. Nothing you wrote is deleted or overwritten.</span></div>
     <div class="mdl-opt"><button class="btn" data-act="imp-replace">Replace my library</button><span>Removes your current library first, then imports this file.</span></div>
     <div class="mdl-foot"><button class="btn ghost" data-act="modal-close">Cancel</button></div>`;
   else body = `
     <h2 id="mdl-h">Replace your library?</h2>
-    <p>${mine ? `This removes ${n(mine, "paper")} from this browser, with ${mine === 1 ? "its PDF" : "their PDFs"}, highlights, notes and history` : "This removes the example papers"}${mine && S.papers.some(p => p.sample) ? ", plus the example papers" : ""}. Then it imports ${n(IMP.papers.length, "paper")} from the file.</p>
+    <p>${mine ? `This removes ${n(mine, "paper")} from this browser, with ${mine === 1 ? "its PDF" : "their PDFs"}, highlights, notes and history` : "This removes the example papers"}${mine && S.papers.some(p => p.sample) ? ", plus the example papers" : ""}${tkCount(TK) ? `, and your submissions, projects and own papers (<b class="num">${tkCount(TK)}</b> in all)` : ""}. Then it imports ${n(IMP.papers.length, "paper")} from the file.</p>
     ${mine ? `<p>Export your current library first so you can undo this.</p>` : ""}
     <div class="mdl-foot">
       <button class="btn ghost" data-act="modal-close">Cancel</button>
@@ -1281,7 +1394,7 @@ async function applyImport(replace){
   const imp = IMP; if (!imp) return;
   $("#modal").hidden = true; closeReader();
   toast("Importing…");
-  if (replace){ for (const p of S.papers) await idb.del(p.id); S.papers = []; }
+  if (replace){ for (const p of S.papers) await idb.del(p.id); S.papers = []; await clearTracker(); }
   const stamp = isoDay(Date.now()); let added = 0, updated = 0, pdfs = 0, failed = null;
   for (const inc of imp.papers){
     const cur = S.papers.find(p => p.id === inc.id);
@@ -1293,11 +1406,14 @@ async function applyImport(replace){
     if (cur){ mergeInto(cur, inc, stamp); if (needPdf) cur.hasFile = true; updated++; }
     else { inc.hasFile = needPdf; S.papers.unshift(inc); added++; }
   }
+  const tr = failed ? {added:0, updated:0, failed:0} : await importTracker(imp);
+  if (replace || tr.added || tr.updated) tsave();
   save(); closeModal();
-  S.ui.view = "library"; S.ui.filter = "all"; renderAll();
+  S.ui.view = imp.papers.length || !imp.tracker ? "library" : "subs"; S.ui.filter = "all"; S.ui.tkList = "all"; renderAll();
   const n = (x, w) => `${x} ${w}${x === 1 ? "" : "s"}`;
+  const trTxt = tr.added || tr.updated ? `; tracker: ${tr.added} added, ${tr.updated} updated${tr.failed ? `, ${tr.failed} images or drafts couldn't be saved` : ""}` : "";
   if (failed) toast(`Stopped at "${failed.title}": the browser couldn't save its PDF (storage may be full, or this is a private window). ${n(added, "paper")} added. Try a backup without PDFs.`);
-  else toast(`Added ${n(added, "paper")}, updated ${updated}${pdfs ? `, restored ${n(pdfs, "PDF")}` : ""}`);
+  else toast(`Added ${n(added, "paper")}, updated ${updated}${pdfs ? `, restored ${n(pdfs, "PDF")}` : ""}${trTxt}`);
 }
 
 const isExportFile = f => /\.(zip|json)$/i.test(f.name) || /zip|json/.test(f.type);

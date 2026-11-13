@@ -44,8 +44,14 @@ studydesk-export-2026-11-03.zip
 │   └─ <paper-id>.pdf      the stored copy of each PDF
 ├─ notes/
 │   └─ <title-slug>.md     one readable Markdown file per paper: link, abstract, notes + highlights with pages
+├─ tracker.json            submissions, projects and my papers, when you use them (below)
+├─ images/
+│   └─ <image-id>.png|jpg|webp|gif   images on submissions and projects
+├─ tracker.md              the same, readable: submissions by list, projects with their updates, my papers
 └─ README.txt              what this file is and how to import it
 ```
+
+My papers' draft PDFs go in `pdfs/` too, named by the paper's id.
 
 `notes/` is for people, not for import: the library is readable with any text editor even without StudyDesk.
 
@@ -67,6 +73,10 @@ studydesk-export-2026-11-03.zip
 - UI state (current view, zoom, filters) is left out: it belongs to the browser, not the library.
 - `formatVersion` changes only when the shape changes incompatibly. Importers accept every version up to their own and refuse newer ones with a clear message ("This file was made by a newer StudyDesk. Upgrade with `pip install -U studydesk`.").
 
+### `tracker.json`
+
+`{"format":"studydesk-tracker","formatVersion":1,"appVersion":…,"exportedAt":…,"lists":[…],"submissions":[…],"projects":[…],"myPapers":[…]}`, the same shape as `tracker.json` in the library folder ([trackers.md](trackers.md) § Data). The backup without PDFs carries the same collections inline, as `"tracker"` in its `library.json`, without images or drafts. Exports from before the trackers have neither, and StudyDesk 1.2.0 ignores both when importing.
+
 ## Merge rules ("Add to my library")
 
 Papers are matched by `id` (ids are kept across export and import).
@@ -80,6 +90,19 @@ Papers are matched by `id` (ids are kept across export and import).
 | · notes | Kept if identical. If different, the imported notes are appended under a divider: `--- Imported 2026-11-03 ---` |
 | · status, last page, target | Taken from whichever copy was opened more recently (`lastOpened`) |
 | · PDF | Kept if the library already has one; otherwise taken from the file |
+
+Tracker entries (lists, submissions, projects, my papers) are matched by `id` too:
+
+| Case | Result |
+|---|---|
+| Entry not here | Added, with its image or draft PDF from the file |
+| Entry already here | The copy changed more recently (`updatedAt`) wins, field by field as a whole |
+| · project updates, milestones | Union by `id`, whichever copy wins |
+| · image, draft PDF | Taken from the file only if it has them; otherwise yours stay |
+| List already here | Its order keeps yours and gains the file's entries |
+| Entry whose list is missing | Put in a list called *Imported* |
+
+"Replace my library" also removes the trackers, with their images and drafts, before importing.
 
 The rule throughout: **import never deletes or overwrites anything the user wrote.** Only "Replace my library" removes data, and only after confirmation.
 

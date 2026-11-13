@@ -2,7 +2,7 @@
 // Starts its own studydesk on a throwaway folder (deleted and recreated), so run Chrome with a fresh --user-data-dir:
 //   chrome --headless=new --remote-debugging-port=9352 --user-data-dir=<temp dir> about:blank
 //   node scripts/e2e/trackers.mjs 9352 <abs empty work dir> [outDir]      (from the repo root)
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { rmSync, mkdirSync, readFileSync, existsSync, writeFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 const [port, work, out] = process.argv.slice(2);
@@ -356,6 +356,49 @@ try {
       check(await C.js(`(() => { const i = document.querySelector('.tk-thumb img'); return !!i && i.src.startsWith("blob:") && i.naturalWidth === 16; })()`) && await C.js(`JSON.parse(localStorage.getItem("studydesk.tracker.v1")).submissions[0].title`) === "Browser-mode call", "on a static server the tracker is in localStorage and the image in IndexedDB; both survive a reload");
       check(!C.errs.length, `no script errors in browser mode (${C.errs.join(" | ")})`);
       C.close();
+    } finally { st.kill(); }
+  }
+
+  // ---------- export and import carry the trackers ----------
+  {
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAHUlEQVR42mNkYPhfz0AEYBxVSF+FjAwM/xkYGBgAKZgD/Sq4mSkAAAAASUVORK5CYII=", "base64"), pngPath = join(work, "flyer.png");
+    const setFile = async (T, sel, path) => { const d = await T.cdp("DOM.getDocument"); const n = await T.cdp("DOM.querySelector", { nodeId: d.root.nodeId, selector: sel }); await T.cdp("DOM.setFileInputFiles", { nodeId: n.nodeId, files: [path] }); await wait(400); };
+    await A.click(btn("tk-subs", "all")); await A.click(byText(".tk-t", "/^Open conf$/")); await setFile(A, "#xfImgIn", pngPath); await A.click(btn("sub-save")); await wait(800);
+    const dl = join(work, "dl"); mkdirSync(dl, { recursive: true });
+    await A.cdp("Page.setDownloadBehavior", { behavior: "allow", downloadPath: dl });
+    const waitFile = async re => { for (let i = 0; i < 40; i++) { const f = readdirSync(dl).find(n => re.test(n)); if (f) { await wait(300); return join(dl, f); } await wait(250); } return null; };
+    await A.click(btn("exp")); const zipPath = await waitFile(/^studydesk-export-.*\.zip$/);
+    check(!!zipPath, "Export library makes a zip");
+    const names = JSON.parse(spawnSync("python", ["-c", "import sys,zipfile,json;print(json.dumps(zipfile.ZipFile(sys.argv[1]).namelist()))", zipPath], { encoding: "utf8" }).stdout);
+    const T0 = await disk(), conf = T0.submissions.find(x => x.title === "Open conf"), survey = T0.myPapers.find(m => /survey/.test(m.title));
+    check(names.includes("tracker.json") && names.includes("tracker.md") && names.includes(`images/${conf.image.id}.png`) && names.includes(`pdfs/${survey.id}.pdf`), `the zip has tracker.json, tracker.md, the image and the draft PDF (${names.filter(n => !n.startsWith("notes/")).join(", ")})`);
+    const md = spawnSync("python", ["-c", "import sys,zipfile;sys.stdout.buffer.write(zipfile.ZipFile(sys.argv[1]).read('tracker.md'))", zipPath], { encoding: "utf8" }).stdout;
+    check(/## Where to submit/.test(md) && /\*\*Open conf\*\*/.test(md) && /## Thesis chapter 3 \(Active\)/.test(md) && /\*\*LLM evaluation survey\*\* · Submitted/.test(md), "tracker.md reads as a plain list of submissions, projects and papers");
+    await A.click(btn("about")); await A.click(btn("exp-lite")); const jsonPath = await waitFile(/^studydesk-backup-.*\.json$/);
+    const backup = JSON.parse(readFileSync(jsonPath, "utf8"));
+    check(backup.format === "pdfdesk-export" && backup.tracker && backup.tracker.submissions.length === T0.submissions.length && backup.tracker.projects.length === 1, "the backup without PDFs carries the tracker inline, under the same export format");
+
+    const st = spawn("node", ["scripts/serve.mjs", "5196"], { stdio: "ignore" }); await wait(1200);
+    try {
+      const D = await tab("http://localhost:5196/");
+      await setFile(D, "#impIn", zipPath); await wait(600);
+      const sum = await D.js(`document.querySelector('.mdl-sum').textContent`);
+      check(new RegExp(`${T0.submissions.length} submissions, 1 project and 2 papers of your own: ${T0.submissions.length + 3} new`).test(sum.replace(/\s+/g, " ")), `the import dialog counts the tracker entries (${sum.replace(/\s+/g, " ").trim()})`);
+      await D.click(btn("imp-add")); await wait(2500);
+      await D.click(btn("tk-subs", "all")); await wait(500);
+      check(await D.js(`document.querySelectorAll('.tk-row').length`) === T0.submissions.length && await D.js(`(() => { const i = ${byText(".tk-row", "/Open conf/")}.querySelector('.tk-thumb img'); return !!i && i.naturalWidth === 16; })()`), "imported into another browser: every submission, with its image");
+      await D.click(btn("mypapers"));
+      check(/Open draft PDF/.test(await D.js(`${byText(".tk-row", "/survey/")}.innerText`)) && /Thesis chapter 3/.test(await D.js(`${byText(".tk-row", "/survey/")}.innerText`)), "my papers come with their draft and project");
+      await D.click(btn("tk-projs", "all")); await D.click(btn("proj-open", "oldproj01"));
+      const nUpd = await D.js(`document.querySelectorAll('.pu').length`);
+      check(nUpd >= 1 && /Send draft to supervisor/.test(await D.js(`document.querySelector('.pm-list').textContent`)), "projects come with their updates and milestones");
+      await setFile(D, "#impIn", zipPath); await wait(600);
+      check(/: 0 new/.test(await D.js(`document.querySelector('.mdl-sum').textContent`)), "importing the same file again: nothing new");
+      await D.click(btn("imp-add")); await wait(2500);
+      const DT = await D.js(`JSON.parse(localStorage.getItem("studydesk.tracker.v1"))`);
+      check(DT.submissions.length === T0.submissions.length && DT.projects[0].updates.length === nUpd && DT.myPapers.length === 2 && DT.lists.filter(l => l.section === "submissions").length === 1, "and nothing is doubled: entries, lists and project updates stay as they were");
+      check(!D.errs.length, `no script errors while importing (${D.errs.join(" | ")})`);
+      D.close();
     } finally { st.kill(); }
   }
 
