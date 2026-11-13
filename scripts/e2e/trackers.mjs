@@ -95,8 +95,39 @@ try {
   await A.fill("sfList", await A.js(`[...document.querySelectorAll('#sfList option')].find(o => /Conferences/.test(o.textContent)).value`));
   await A.click(btn("sub-save")); await wait(300);
   await A.click(byText(".tk-nav .nav-i", "/Conferences 2027/"));
-  check(JSON.stringify(await A.js(`[...document.querySelectorAll('.tk-rank')].map(r => r.textContent)`)) === '["1","2"]' && await A.js(`${byText(".tk-nav .nav-i", "/Where to submit/")}.querySelector('.ct').textContent`) === "0", "moving an entry to another list: it joins the end of that list's priority order");
+  check(JSON.stringify(await A.js(`[...document.querySelectorAll('.tk-grip')].map(r => r.textContent)`)) === '["1","2"]' && await A.js(`${byText(".tk-nav .nav-i", "/Where to submit/")}.querySelector('.ct').textContent`) === "0", "moving an entry to another list: it joins the end of that list's priority order");
   await A.shot("tk-list");
+
+  // ---------- reorder: arrows, drag by the number, Alt+arrow ----------
+  const titles = () => A.js(`[...document.querySelectorAll('.tk-t')].map(b => b.textContent.split(" ")[0])`);
+  const lid = await A.js(`document.querySelector('[data-act="sub-new"]').dataset.v`);
+  check(await A.js(`document.querySelectorAll('.tk-row')[0].querySelector('[data-act="tk-up"]').disabled && document.querySelectorAll('.tk-row')[1].querySelector('[data-act="tk-down"]').disabled`), "the first row can't move up and the last can't move down");
+  await A.click(`document.querySelectorAll('.tk-row')[0].querySelector('[data-act="tk-down"]')`);
+  check(JSON.stringify(await titles()) === '["Journal","ExampleConf"]' && await A.js(`!!document.activeElement.closest('.tk-row')?.innerText.includes("ExampleConf")`), "Move down swaps the two and keeps focus on the moved entry");
+  await wait(600);
+  const ord = (await disk()).lists.find(l => l.id === lid).order, subs = (await disk()).submissions;
+  check(ord.map(id => subs.find(x => x.id === id).title.split(" ")[0]).join() === "Journal,ExampleConf", "the new order is saved to disk");
+  await A.js(`(() => { const rows = document.querySelectorAll('.tk-row'), dt = new DataTransfer(), g = rows[1].querySelector('.tk-grip'), r0 = rows[0].getBoundingClientRect();
+    g.dispatchEvent(new DragEvent('dragstart', {bubbles:true, dataTransfer:dt}));
+    rows[0].dispatchEvent(new DragEvent('dragover', {bubbles:true, cancelable:true, dataTransfer:dt, clientY:r0.top + 5}));
+    rows[0].dispatchEvent(new DragEvent('drop', {bubbles:true, cancelable:true, dataTransfer:dt, clientY:r0.top + 5})); })()`); await wait(300);
+  check(JSON.stringify(await titles()) === '["ExampleConf","Journal"]' && JSON.stringify(await A.js(`[...document.querySelectorAll('.tk-grip')].map(g => g.textContent)`)) === '["1","2"]', "dragging the second entry by its number onto the top half of the first puts it first");
+  await A.js(`document.querySelectorAll('.tk-t')[0].focus()`);
+  for (const type of ["keyDown", "keyUp"]) await A.cdp("Input.dispatchKeyEvent", { type, key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40, modifiers: 1 }); await wait(300);
+  check(JSON.stringify(await titles()) === '["Journal","ExampleConf"]' && await A.js(`document.activeElement.classList.contains('tk-t') && /ExampleConf/.test(document.activeElement.textContent)`), "Alt+↓ on an entry moves it down, focus stays on it");
+
+  // ---------- filters ----------
+  await A.click(btn("tk-subs", "all"));
+  await A.fill("tfTopic", "llm-evaluation"); await wait(200);
+  check(JSON.stringify(await titles()) === '["Journal"]' && /Showing 1 of 2 entries/.test(await A.js(`document.querySelector('.sub').textContent`)), "filtering by topic: only matching entries, and the count says 1 of 2");
+  await A.click(byText(".tk-nav .nav-i", "/Conferences 2027/"));
+  check(JSON.stringify(await titles()) === '["Journal"]' && await A.js(`document.querySelector('#tfTopic').value`) === "llm-evaluation" && JSON.stringify(await A.js(`[...document.querySelectorAll('.tk-grip')].map(g => g.textContent)`)) === '["1"]', "filters carry over to a list, which keeps showing the true priority number");
+  await A.click(btn("tkf-clear")); await A.fill("tfSt", "open"); await wait(200);
+  check(JSON.stringify(await titles()) === '["ExampleConf"]', "Not submitted yet hides the one already submitted");
+  await A.fill("tfSt", ""); await A.fill("tfKind", "chapter"); await wait(200);
+  check(await A.js(`/match these filters/.test(document.querySelector('.empty').textContent)`), "no matches: says so, with Clear filters");
+  await A.click(btn("tkf-clear"));
+  check((await titles()).length === 2 && !(await A.js(`!!document.querySelector('.tk-flt [data-act="tkf-clear"]')`)), "Clear filters shows everything again");
 
   const d1 = await disk();
   check(d1 && d1.submissions.length === 2 && d1.lists.length === 2 && d1.submissions.find(x => x.kind === "conference").deadline.aoe === true && d1.submissions.find(x => x.kind === "journal").apc.amount === 1800, "tracker.json on disk has both entries and lists");

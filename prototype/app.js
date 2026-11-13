@@ -552,7 +552,8 @@ const FEATURES = [
     "Deadlines with an optional time and AoE; ones a week away or closer are flagged, and closed ones say so",
     "APC or No APC, the zero-APC last date, Scopus or not, topics and your own notes",
     "Conferences add abstract, notification and camera-ready dates, dates and place",
-    "Your own lists, each in priority order; All submissions shows every list by nearest deadline",
+    "Your own lists, each in priority order: drag an entry by its number, or use the arrows or Alt+↑ / Alt+↓",
+    "All submissions shows every list by nearest deadline; filter by kind, Scopus, status, topic or free to publish now",
     "Mark as submitted in one click; status runs from Considering to Accepted or Rejected"]],
   ["Export and import", [
     "Export the whole library as one .zip: PDFs, highlights, notes, sessions, plus a readable Markdown file per paper with its link and abstract",
@@ -565,7 +566,7 @@ const FEATURES = [
     "The PDF engine and fonts are built in, so it works without internet",
     "Dark mode follows your system setting"]],
 ];
-const KEYS = [[["j", "→"], "Next page"], [["k", "←"], "Previous page"], [["b"], "Bookmark this page"], [["Alt", "←"], "Back to where you were before a link"], [["["], "Show or hide the sidebar"], [["]"], "Show or hide notes and highlights"], [["Enter"], "Jump to the page typed in the page box"], [["Esc"], "Close the highlight menu"]];
+const KEYS = [[["j", "→"], "Next page"], [["k", "←"], "Previous page"], [["b"], "Bookmark this page"], [["Alt", "←"], "Back to where you were before a link"], [["["], "Show or hide the sidebar"], [["]"], "Show or hide notes and highlights"], [["Enter"], "Jump to the page typed in the page box"], [["Esc"], "Close the highlight menu"], [["Alt", "↑"], "Move a submission up its list (Alt+↓ moves it down)"]];
 
 function aboutHTML(){
   const links = AUTHOR.links.filter(l => l.url);
@@ -628,6 +629,8 @@ const ICON = {
   bm:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2.5h8v11L8 10.5l-4 3z"/></svg>',
   sideL:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6 3v10"/></svg>',
   sideR:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M10 3v10"/></svg>',
+  up:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 10 4-4 4 4"/></svg>',
+  down:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 6 4 4 4-4"/></svg>',
   bmOn:'<svg viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1.6"><path d="M4 2.5h8v11L8 10.5l-4 3z"/></svg>'
 };
 
@@ -1766,7 +1769,7 @@ function fmtMoney(a){
   catch(e){ return `APC ${a.amount.toLocaleString()} ${a.currency || ""}`.trim(); }
 }
 
-function subRow(x, rank, showList){
+function subRow(x, rank, showList, moves){
   const due = dueAt(x.deadline), open = isOpen(x);
   const cls = due && open ? (due < Date.now() ? "over" : daysTo(due) <= 7 ? "soon" : "") : "";
   const c = x.conf || {}, abs = x.kind === "conference" ? dayAt(c.abstract) : null, zero = dayAt(x.zeroApcUntil), l = getList(x.list);
@@ -1777,7 +1780,7 @@ function subRow(x, rank, showList){
     fmtMoney(x.apc) ? `<span>${esc(fmtMoney(x.apc))}</span>` : "", zeroTxt, confTxt, showList && l ? `<span>in ${esc(l.name)}</span>` : ""].filter(Boolean);
   const sentTxt = x.submitted && isDate(x.submitted.date) ? `<span class="tk-sent">Submitted ${fmtDate(dayAt(x.submitted.date))}</span>` : "";
   return `<div class="tk-row${rank ? "" : " no-rank"}" data-id="${x.id}">
-    ${rank ? `<span class="tk-rank num" title="Priority ${rank}">${rank}</span>` : ""}
+    ${rank ? rankCell(x, rank, moves) : ""}
     <div class="tk-body">
       <div class="tk-top"><span class="tk-kind">${labelOf(SUB_KINDS, x.kind)}</span>${x.indexing === "scopus" ? '<span class="tk-badge">Scopus</span>' : x.indexing === "none" ? '<span class="tk-badge off">Not Scopus</span>' : ""}</div>
       <button class="tk-t" data-act="sub-edit" data-v="${x.id}">${esc(x.title || linkHost(x.url) || "Untitled")}</button>
@@ -1793,16 +1796,68 @@ function subRow(x, rank, showList){
   </div>`;
 }
 
+// The priority number is the drag handle; the arrows move one place among the rows shown (also Alt+↑ / Alt+↓).
+function rankCell(x, rank, moves){
+  const [up, down] = moves || [false, false];
+  return `<div class="tk-rank"><span class="tk-grip num" draggable="true" title="Priority ${rank}. Drag to reorder" aria-hidden="true">${rank}</span>
+    <button class="tk-mv" data-act="tk-up" data-v="${x.id}" aria-label="Move up"${up ? "" : " disabled"}>${ICON.up}</button>
+    <button class="tk-mv" data-act="tk-down" data-v="${x.id}" aria-label="Move down"${down ? "" : " disabled"}>${ICON.down}</button></div>`;
+}
+// Put an entry before or after another one in its list's priority order.
+function tkMove(id, targetId, after){
+  const x = getSub(id) || TK.projects.find(y => y.id === id), l = x && getList(x.list); if (!l) return false;
+  const ids = listItems(l).map(y => y.id).filter(i => i !== id);
+  let k = ids.indexOf(targetId); if (k < 0) k = ids.length; else if (after) k++;
+  ids.splice(k, 0, id); l.order = ids; tsave(); return true;
+}
+function tkStep(id, dir, focusSel){ // focusSel: what to focus in the moved row afterwards
+  const rows = [...document.querySelectorAll(".tk-list.ordered .tk-row")].map(el => el.dataset.id), i = rows.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= rows.length) return;
+  tkMove(id, rows[j], dir > 0); rerenderKeep();
+  const b = document.querySelector(`.tk-row[data-id="${id}"] ${focusSel}`);
+  (b && !b.disabled ? b : document.querySelector(`.tk-row[data-id="${id}"] .tk-t`))?.focus();
+}
+function rerenderKeep(){ const m = $("#main"), y = m.scrollTop; renderSide(); renderMain(); m.scrollTop = y; }
+
+// Filters for the submission views; kept per browser in S.ui.tkF and shared by every list.
+const TKF0 = {kind:"", idx:"", st:"", topic:"", free:false};
+const tkF = () => Object.assign({}, TKF0, S.ui.tkF || {});
+const freeNow = x => !!(x.apc && x.apc.free) || (dayAt(x.zeroApcUntil) ?? 0) >= Date.now();
+const tkFiltered = () => { const f = tkF(); return !!(f.kind || f.idx || f.st || f.topic || f.free); };
+function subFilter(items){
+  const f = tkF();
+  return items.filter(x => (!f.kind || x.kind === f.kind) && (!f.idx || x.indexing === f.idx)
+    && (!f.st || (f.st === "open" ? isOpen(x) : f.st === "sent" ? SENT.has(x.status) : x.status === f.st))
+    && (!f.topic || (x.topics || []).includes(f.topic)) && (!f.free || freeNow(x)));
+}
+function subFilterBar(scope){
+  const f = tkF(), topics = [...new Set(scope.flatMap(x => x.topics || []))].sort();
+  const sel = (id, key, label, opts) => `<label class="flt" for="${id}"><span class="vh">${label}</span><select class="in" id="${id}" data-tkf="${key}">${opts.map(([k, lb]) => `<option value="${esc(k)}"${k === f[key] ? " selected" : ""}>${esc(lb)}</option>`).join("")}</select></label>`;
+  return `<div class="tk-flt" role="group" aria-label="Filter submissions">
+    ${sel("tfKind", "kind", "Kind", [["", "All kinds"], ...SUB_KINDS])}
+    ${sel("tfIdx", "idx", "Indexing", [["", "Any indexing"], ["scopus", "Scopus"], ["none", "Not Scopus"], ["unknown", "Indexing unknown"]])}
+    ${sel("tfSt", "st", "Status", [["", "Any status"], ["open", "Not submitted yet"], ["sent", "Submitted or later"], ...SUB_STATUS.map(st => [st[0], st[1]])])}
+    ${topics.length || f.topic ? sel("tfTopic", "topic", "Topic", [["", "Any topic"], ...[...new Set([...topics, ...(f.topic ? [f.topic] : [])])].map(t => [t, "#" + t])]) : ""}
+    <label class="chk" for="tfFree"><input type="checkbox" id="tfFree" data-tkf="free"${f.free ? " checked" : ""}> Free to publish now</label>
+    ${tkFiltered() ? `<button class="btn sm ghost" data-act="tkf-clear">Clear filters</button>` : ""}
+  </div>`;
+}
+
 function subsHTML(){
   const l = S.ui.tkList !== "all" ? getList(S.ui.tkList) : null;
-  const items = l ? listItems(l) : TK.submissions.slice().sort((a, b) => (dueAt(a.deadline) ?? Infinity) - (dueAt(b.deadline) ?? Infinity) || (a.addedAt || 0) - (b.addedAt || 0));
-  const n = items.length, ent = `<span class="num">${n}</span> ${n === 1 ? "entry" : "entries"}`;
+  const scope = l ? listItems(l) : TK.submissions.slice().sort((a, b) => (dueAt(a.deadline) ?? Infinity) - (dueAt(b.deadline) ?? Infinity) || (a.addedAt || 0) - (b.addedAt || 0));
+  const items = subFilter(scope), n = items.length, all = scope.length;
+  const ent = k => `<span class="num">${k}</span> ${k === 1 ? "entry" : "entries"}`;
+  const count = n === all ? `${ent(n)}.` : `Showing <span class="num">${n}</span> of ${ent(all)}.`;
   const none = !TK.submissions.length && !tkLists("submissions").length;
+  const rank = new Map(scope.map((x, i) => [x.id, i + 1]));
   return `<div class="wrap">
     <div class="head-row"><div><div class="eyebrow">Submissions</div><h1 class="page-h">${l ? esc(l.name) : "All submissions"}</h1>
-      <p class="sub">${l ? `In priority order. ${ent}.` : `Every list, nearest deadline first. ${ent}.`}</p></div>
+      <p class="sub">${l ? `In priority order. ${count}` : `Every list, nearest deadline first. ${count}`}</p></div>
       <div class="row">${l ? `<button class="btn" data-act="list-rename" data-v="${l.id}">Rename list</button><button class="btn" data-act="list-del" data-v="${l.id}">Delete list</button>` : ""}<button class="btn primary" data-act="sub-new" data-v="${l ? l.id : ""}">+ Add submission</button></div></div>
-    ${n ? `<div class="tk-list">${items.map((x, i) => subRow(x, l ? i + 1 : 0, !l)).join("")}</div>`
+    ${all ? subFilterBar(scope) : ""}
+    ${n ? `<div class="tk-list${l ? " ordered" : ""}">${items.map((x, i) => subRow(x, l ? rank.get(x.id) : 0, !l, [i > 0, i < n - 1])).join("")}</div>`
+      : all ? `<div class="empty">No entries here match these filters. <button class="path-link" data-act="tkf-clear">Clear filters</button></div>`
       : none ? `<div class="empty">Keep track of the journals, special issues, book chapter calls and conferences you might send a paper to: their deadlines, APC, Scopus indexing and where each one stands. Add the first one with + Add submission.</div>`
       : `<div class="empty">${l ? "This list is empty. Add a submission to it, or move one here from its edit form." : "No submissions yet."}</div>`}
   </div>`;
@@ -2083,6 +2138,9 @@ document.addEventListener("click", async e => {
     case "sub-del-no": $("#sfFoot").innerHTML = sfFoot(true); break;
     case "sub-del-yes": subDelete(); break;
     case "sub-mark": subMark(v); break;
+    case "tk-up": tkStep(v, -1, '[data-act="tk-up"]'); break;
+    case "tk-down": tkStep(v, 1, '[data-act="tk-down"]'); break;
+    case "tkf-clear": S.ui.tkF = {...TKF0}; save(); rerenderKeep(); break;
     case "sf-kind": case "sf-index": sfSeg(a, v); break;
     case "list-new": showListForm(v); break;
     case "list-rename": showListForm(getList(v)?.section || "submissions", v); break;
@@ -2099,6 +2157,7 @@ document.addEventListener("input", e => {
   if (t.id === "lkUrl"){ linkUrlChanged(); return; }
   if (t.id === "lkBib"){ linkBibChanged(); return; }
   if (t.id === "sfStatus" || t.id === "sfFree"){ sfChanged(t); return; }
+  if (t.dataset && t.dataset.tkf){ S.ui.tkF = {...tkF(), [t.dataset.tkf]:t.type === "checkbox" ? t.checked : t.value}; save(); rerenderKeep(); document.getElementById(t.id)?.focus(); return; }
   if (t.classList.contains("tag-in")){ if (t.value.includes(",")){ addTag(t.dataset.tags, t.value); } else tagSuggest(t); return; } // comma pasted or typed on mobile keyboards
   if (!R) return; const p = getP(R.id);
   if (t.id === "noteTa"){ p.notes = t.value; saveSoon(); }
@@ -2110,6 +2169,7 @@ document.addEventListener("keydown", e => {
   if (t.classList && t.classList.contains("tag-in") && tagKey(e, t)) return;
   if (e.key === "Escape" && !$("#modal").hidden){ if (formDirty()){ ($("#lkMsg") || $("#sfMsg")).textContent = "Press Cancel to discard what you've typed."; return; } closeModal(); return; }
   if (t.id === "lfName" && e.key === "Enter"){ e.preventDefault(); listSave(); return; }
+  if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && t.closest && t.closest(".tk-list.ordered .tk-row")){ e.preventDefault(); tkStep(t.closest(".tk-row").dataset.id, e.key === "ArrowUp" ? -1 : 1, ".tk-t"); return; }
   if (t.id === "idIn" && e.key === "Enter"){ e.preventDefault(); addById(); return; }
   if (e.altKey && e.key === "ArrowLeft" && R && R.hist.length){ e.preventDefault(); goBack(); return; }  // instead of leaving the page
   if (R && R.editSess && t.closest && t.closest(".sess-form")){
@@ -2138,6 +2198,29 @@ $("#impIn").addEventListener("change", e => { const f = e.target.files[0]; e.tar
 const formDirty = () => linkDirty() || subDirty();
 $("#modal").addEventListener("click", e => { if (e.target.id === "modal" && !formDirty()) closeModal(); });
 $("#attachIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) attachFile(f); });
+// Drag a row by its priority number to reorder the list.
+let DRAG = null;
+const dropMarks = () => document.querySelectorAll(".tk-row.drop-before, .tk-row.drop-after").forEach(el => el.classList.remove("drop-before", "drop-after"));
+document.addEventListener("dragstart", e => {
+  const g = e.target.closest && e.target.closest(".tk-grip"), row = g && g.closest(".tk-row"); if (!row) return;
+  DRAG = row.dataset.id; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", DRAG);
+  try { e.dataTransfer.setDragImage(row, 24, 24); } catch(err){}
+  row.classList.add("dragging");
+});
+document.addEventListener("dragover", e => {
+  if (!DRAG) return; const row = e.target.closest && e.target.closest(".tk-list.ordered .tk-row");
+  if (!row || row.dataset.id === DRAG) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = "move";
+  const after = e.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2;
+  if (!row.classList.contains(after ? "drop-after" : "drop-before")){ dropMarks(); row.classList.add(after ? "drop-after" : "drop-before"); }
+});
+document.addEventListener("drop", e => {
+  if (!DRAG) return; e.preventDefault(); e.stopPropagation();
+  const row = e.target.closest && e.target.closest(".tk-list.ordered .tk-row"), id = DRAG; DRAG = null;
+  if (row && row.dataset.id !== id && tkMove(id, row.dataset.id, row.classList.contains("drop-after"))) rerenderKeep();
+  dropMarks();
+}, true);
+document.addEventListener("dragend", () => { DRAG = null; dropMarks(); document.querySelectorAll(".tk-row.dragging").forEach(el => el.classList.remove("dragging")); });
 let dragN = 0;
 window.addEventListener("dragenter", e => { if ([...(e.dataTransfer?.types||[])].includes("Files")){ dragN++; $("#drop").hidden = false; } });
 window.addEventListener("dragleave", () => { dragN = Math.max(0, dragN-1); if (!dragN) $("#drop").hidden = true; });

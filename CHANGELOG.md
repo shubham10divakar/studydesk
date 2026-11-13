@@ -4,7 +4,7 @@ All notable changes to StudyDesk (called PDFDesk up to 1.1.1). Versions follow [
 
 ## Unreleased
 
-- **Submissions tracker.** A new *Submissions* section in the sidebar keeps the journals, special issues, book chapter calls and conferences you might submit to: link, deadline (with time and AoE), APC or No APC, zero-APC last date, Scopus or not, topics, notes, and for conferences the abstract, notification and camera-ready dates and the place. Make your own lists; each shows its entries in priority order, and *All submissions* shows them all by nearest deadline. Deadlines a week away are flagged. *Mark as submitted* records the date. Saved in `tracker.json` in the library folder (not in exports yet).
+- **Submissions tracker.** A new *Submissions* section in the sidebar keeps the journals, special issues, book chapter calls and conferences you might submit to: link, deadline (with time and AoE), APC or No APC, zero-APC last date, Scopus or not, topics, notes, and for conferences the abstract, notification and camera-ready dates and the place. Make your own lists; each shows its entries in priority order, and *All submissions* shows them all by nearest deadline. Deadlines a week away are flagged. *Mark as submitted* records the date. Reorder a list by dragging an entry's number, with its arrows, or with `Alt+↑` / `Alt+↓`. Filter by kind, Scopus, status, topic, or *Free to publish now*. Saved in `tracker.json` in the library folder (not in exports yet).
 
 ## 1.2.0 (2026-11-13)
 

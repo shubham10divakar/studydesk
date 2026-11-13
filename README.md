@@ -154,7 +154,8 @@ Keep the calls you collect in one place: journals, special issues, book chapter 
 
 - **Everything about a call:** its link, the submission deadline (with a time and AoE if you like), APC or *No APC*, the zero-APC last date, Scopus or not, topics and your notes. Conferences add abstract, notification and camera-ready dates, plus when and where.
 - **Deadlines you can't miss:** each entry counts down ("in 5 days"), flags deadlines a week away or closer, and says when one has closed.
-- **Your own lists, in priority order:** make as many as you like (*Q1 journals*, *Conferences 2027*, *Free until March*). *All submissions* shows every list, nearest deadline first.
+- **Your own lists, in priority order:** make as many as you like (*Q1 journals*, *Conferences 2027*, *Free until March*), and drag an entry by its number (or use its arrows, or `Alt+↑` / `Alt+↓`) to reorder. *All submissions* shows every list, nearest deadline first.
+- **Filters:** kind, Scopus or not, status (*Not submitted yet*, *Submitted or later*, or one status), topic, and *Free to publish now* (no APC, or still before the zero-APC date).
 - **Mark as submitted** in one click, then follow it from *Considering* to *Accepted* or *Rejected*.
 
 Submissions are saved in `tracker.json` in your library folder. *Export library* doesn't include them yet.
@@ -184,6 +185,7 @@ Dark mode follows your system setting. Typography is set for long reading sessio
 | `]` | Show or hide notes and highlights |
 | `Enter` in the page box | Jump to page |
 | `Esc` | Close the highlight menu |
+| `Alt+↑` / `Alt+↓` on a submission | Move it up or down its list |
 | `Enter` or `,` in a tag box | Add the suggested tag (or a new one); `↑` `↓` choose, `Backspace` removes the last tag |
 
 ---
