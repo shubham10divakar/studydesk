@@ -2,6 +2,10 @@
 
 All notable changes to StudyDesk (called PDFDesk up to 1.1.1). Versions follow [semantic versioning](https://semver.org/); dates are release dates.
 
+## Unreleased
+
+- **Submissions tracker.** A new *Submissions* section in the sidebar keeps the journals, special issues, book chapter calls and conferences you might submit to: link, deadline (with time and AoE), APC or No APC, zero-APC last date, Scopus or not, topics, notes, and for conferences the abstract, notification and camera-ready dates and the place. Make your own lists; each shows its entries in priority order, and *All submissions* shows them all by nearest deadline. Deadlines a week away are flagged. *Mark as submitted* records the date. Saved in `tracker.json` in the library folder (not in exports yet).
+
 ## 1.2.0 (2026-11-13)
 
 - **PDFDesk is now StudyDesk.** Install with `pip install studydesk` and start it with `studydesk`. The repo moved to https://github.com/shubham10divakar/studydesk.

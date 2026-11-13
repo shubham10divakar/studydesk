@@ -342,6 +342,14 @@ function renderSide(){
         ${STATUSES.map(([k,l]) => `<button class="nav-i ${f===k?"on":""}" data-act="filter" data-v="${k}"><span class="dot" style="--c:${scol(k)}"></span>${l}<span class="ct">${counts[k]}</span></button>`).join("")}
       </nav>
     </div>
+    <div>
+      <div class="nav-h">Submissions</div>
+      <nav class="nav tk-nav">
+        <button class="nav-i ${S.ui.view==="subs"&&S.ui.tkList==="all"?"on":""}" data-act="tk-subs" data-v="all">All submissions<span class="ct">${TK.submissions.length}</span></button>
+        ${tkLists("submissions").map(l => `<button class="nav-i ${S.ui.view==="subs"&&S.ui.tkList===l.id?"on":""}" data-act="tk-subs" data-v="${l.id}"><span class="tk-li">${esc(l.name)}</span><span class="ct">${listItems(l).length}</span></button>`).join("")}
+        <button class="nav-i nav-add" data-act="list-new" data-v="submissions">+ New list</button>
+      </nav>
+    </div>
     <div class="nav tagsnav">
       <div class="nav-h">Tags</div>
       ${Object.entries(tags).sort((a,b)=>b[1]-a[1]).map(([t,c]) => `<button class="nav-i ${f==="tag:"+t?"on":""}" data-act="filter" data-v="tag:${esc(t)}"><span class="num" style="color:var(--faint)">#</span>${esc(t)}<span class="ct">${c}</span></button>`).join("")}
@@ -461,7 +469,7 @@ function libHTML(){
 
 function renderMain(){
   const m = $("#main"); m.classList.remove("is-reader");
-  m.innerHTML = S.ui.view === "library" ? libHTML() : S.ui.view === "about" ? aboutHTML() : homeHTML();
+  m.innerHTML = S.ui.view === "library" ? libHTML() : S.ui.view === "about" ? aboutHTML() : S.ui.view === "subs" ? subsHTML() : homeHTML();
   m.scrollTop = 0;
 }
 function renderAll(){ renderSide(); if (S.ui.view === "reader" && R) renderPanel(); else renderMain(); applyLayout(); }
@@ -539,6 +547,13 @@ const FEATURES = [
     "Continue reading with one-click resume",
     "A 17-week reading calendar with your streak and total hours",
     "Up next by target date, a daily revision queue of past highlights, and the full reading log"]],
+  ["Submissions", [
+    "Track journals, special issues, book chapter calls and conferences you might submit to, each with its link",
+    "Deadlines with an optional time and AoE; ones a week away or closer are flagged, and closed ones say so",
+    "APC or No APC, the zero-APC last date, Scopus or not, topics and your own notes",
+    "Conferences add abstract, notification and camera-ready dates, dates and place",
+    "Your own lists, each in priority order; All submissions shows every list by nearest deadline",
+    "Mark as submitted in one click; status runs from Considering to Accepted or Rejected"]],
   ["Export and import", [
     "Export the whole library as one .zip: PDFs, highlights, notes, sessions, plus a readable Markdown file per paper with its link and abstract",
     "A small backup without PDFs for frequent saves",
@@ -1206,7 +1221,7 @@ function showImportDialog(step){
 function closeModal(){
   const m = $("#modal"); m.hidden = true; m.innerHTML = ""; IMP = null;
   if (LINK && LINK.hasFile && !LINK.saved) idb.del(LINK.id);   // Add by link looked up an arXiv PDF, then was cancelled
-  LINK = null;
+  LINK = null; SUBF = null; LISTF = null;
 }
 
 function mergeInto(cur, inc, stamp){
@@ -1709,19 +1724,235 @@ document.addEventListener("mousemove", e => {
   });
 }, {passive:true});
 
+/* ---------------- submissions tracker ---------------- */
+// Places you could send a paper: journals, special issues, book chapter calls, conferences (spec: docs/trackers.md).
+// Each entry is in one list, and a list's order is its priority. Stored in TK (tracker storage), saved with tsave().
+const SUB_KINDS = [["journal","Journal"],["special","Special issue"],["chapter","Book chapter"],["conference","Conference"]];
+const SUB_STATUS = [["considering","Considering","--s-inbox"],["preparing","Preparing","--s-planned"],["submitted","Submitted","--s-reading"],["review","Under review","--s-paused"],["revision","Revision requested","--s-paused"],["accepted","Accepted","--s-completed"],["rejected","Rejected","--s-revisit"],["withdrawn","Withdrawn","--faint"],["missed","Missed","--faint"]];
+const SUB_INDEX = [["scopus","Scopus"],["none","Not Scopus"],["unknown","Unknown"]];
+const SENT = new Set(["submitted","review","revision","accepted","rejected"]);   // the paper has gone in
+const labelOf = (pairs, k) => (pairs.find(x => x[0] === k) || [k, k])[1];
+const subPill = s => { const st = SUB_STATUS.find(x => x[0] === s) || SUB_STATUS[0]; return `<span class="pill" style="--c:var(${st[2]})">${st[1]}</span>`; };
+const isOpen = x => !SENT.has(x.status) && x.status !== "withdrawn";
+const getSub = id => TK.submissions.find(x => x.id === id);
+const getList = id => TK.lists.find(l => l.id === id);
+const tkLists = section => TK.lists.filter(l => l.section === section);
+const tkColl = section => section === "projects" ? TK.projects : TK.submissions;
+function listItems(l){ // a list's entries in priority order; any missing from its order go last, oldest first
+  const pos = new Map((l.order || []).map((id, i) => [id, i])), at = x => pos.has(x.id) ? pos.get(x.id) : 1e9;
+  return tkColl(l.section).filter(x => x.list === l.id).sort((a, b) => at(a) - at(b) || (a.addedAt || 0) - (b.addedAt || 0));
+}
+function newList(section, name){ const l = {id:uid(), section, name, order:[], addedAt:Date.now()}; TK.lists.push(l); return l; }
+const SAFE_LINK = /^https?:\/\/[^\s/]+\.[^\s]+$/i;
+const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
+// A deadline {date, time, aoe} as a moment. No time means the end of the day; AoE (Anywhere on Earth) is UTC−12.
+function dueAt(d){
+  if (!d || !isDate(d.date)) return null;
+  const [y, m, dd] = d.date.split("-").map(Number), [h, mi] = /^\d{2}:\d{2}$/.test(d.time || "") ? d.time.split(":").map(Number) : [23, 59];
+  return d.aoe ? Date.UTC(y, m - 1, dd, h, mi) + 12 * 36e5 : new Date(y, m - 1, dd, h, mi).getTime();
+}
+const dayAt = s => isDate(s) ? dueAt({date:s}) : null;
+const daysTo = t => Math.round((day0(t) - day0()) / DAY);
+function dueWords(t){
+  const d = daysTo(t);
+  return t < Date.now() ? (d === 0 ? "closed today" : d === -1 ? "closed yesterday" : `closed ${-d} days ago`) : d === 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`;
+}
+const plainText = s => String(s || "").replace(/^\s*(#{1,3}|[-*]|>)\s+/gm, "").replace(/\*\*?|`/g, "").replace(/\s+/g, " ").trim();
+const fmtFull = t => new Date(t).toLocaleDateString(undefined, {month:"short", day:"numeric", year:"numeric"});
+function fmtMoney(a){
+  if (!a) return ""; if (a.free) return "No APC";
+  if (!Number.isFinite(a.amount)) return "";
+  try { return "APC " + new Intl.NumberFormat(undefined, {style:"currency", currency:a.currency || "USD", maximumFractionDigits:0}).format(a.amount); }
+  catch(e){ return `APC ${a.amount.toLocaleString()} ${a.currency || ""}`.trim(); }
+}
+
+function subRow(x, rank, showList){
+  const due = dueAt(x.deadline), open = isOpen(x);
+  const cls = due && open ? (due < Date.now() ? "over" : daysTo(due) <= 7 ? "soon" : "") : "";
+  const c = x.conf || {}, abs = x.kind === "conference" ? dayAt(c.abstract) : null, zero = dayAt(x.zeroApcUntil), l = getList(x.list);
+  const zeroTxt = zero ? (zero < Date.now() ? `<span>Zero-APC ended ${fmtDate(zero)}</span>` : `<span class="${open && daysTo(zero) <= 7 ? "warn" : ""}">Free to publish until ${fmtDate(zero)}</span>`) : "";
+  const when = isDate(c.from) ? fmtDate(dayAt(c.from)) + (isDate(c.to) && c.to !== c.from ? "–" + fmtDate(dayAt(c.to)) : "") : "";
+  const confTxt = x.kind === "conference" && (when || c.place) ? `<span>Conference ${[when, esc(c.place || "")].filter(Boolean).join(" · ")}</span>` : "";
+  const meta = [x.url && SAFE_LINK.test(x.url) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener" title="Open the call in a new tab">${esc(linkHost(x.url))} ↗</a>` : "",
+    fmtMoney(x.apc) ? `<span>${esc(fmtMoney(x.apc))}</span>` : "", zeroTxt, confTxt, showList && l ? `<span>in ${esc(l.name)}</span>` : ""].filter(Boolean);
+  const sentTxt = x.submitted && isDate(x.submitted.date) ? `<span class="tk-sent">Submitted ${fmtDate(dayAt(x.submitted.date))}</span>` : "";
+  return `<div class="tk-row${rank ? "" : " no-rank"}" data-id="${x.id}">
+    ${rank ? `<span class="tk-rank num" title="Priority ${rank}">${rank}</span>` : ""}
+    <div class="tk-body">
+      <div class="tk-top"><span class="tk-kind">${labelOf(SUB_KINDS, x.kind)}</span>${x.indexing === "scopus" ? '<span class="tk-badge">Scopus</span>' : x.indexing === "none" ? '<span class="tk-badge off">Not Scopus</span>' : ""}</div>
+      <button class="tk-t" data-act="sub-edit" data-v="${x.id}">${esc(x.title || linkHost(x.url) || "Untitled")}</button>
+      ${meta.length ? `<div class="tk-m">${meta.join("")}</div>` : ""}
+      ${x.details ? `<p class="tk-d">${esc(plainText(x.details))}</p>` : ""}
+      ${(x.topics || []).length ? `<div class="row">${x.topics.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
+    </div>
+    <div class="tk-side">
+      ${due ? `<div class="tk-due ${cls}"><span>${fmtFull(due)}${x.deadline.time ? ` ${esc(x.deadline.time)}` : ""}${x.deadline.aoe ? " AoE" : ""}</span><small>${open ? dueWords(due) : "deadline"}</small></div>` : `<div class="tk-due"><small>No deadline set</small></div>`}
+      ${abs && abs >= day0() && open ? `<div class="tk-due ${daysTo(abs) <= 7 ? "soon" : ""}"><small>Abstract ${fmtDate(abs)}, ${dueWords(abs)}</small></div>` : ""}
+      <div class="row tk-acts">${subPill(x.status)}${sentTxt}${open ? `<button class="btn sm" data-act="sub-mark" data-v="${x.id}">Mark as submitted</button>` : ""}</div>
+    </div>
+  </div>`;
+}
+
+function subsHTML(){
+  const l = S.ui.tkList !== "all" ? getList(S.ui.tkList) : null;
+  const items = l ? listItems(l) : TK.submissions.slice().sort((a, b) => (dueAt(a.deadline) ?? Infinity) - (dueAt(b.deadline) ?? Infinity) || (a.addedAt || 0) - (b.addedAt || 0));
+  const n = items.length, ent = `<span class="num">${n}</span> ${n === 1 ? "entry" : "entries"}`;
+  const none = !TK.submissions.length && !tkLists("submissions").length;
+  return `<div class="wrap">
+    <div class="head-row"><div><div class="eyebrow">Submissions</div><h1 class="page-h">${l ? esc(l.name) : "All submissions"}</h1>
+      <p class="sub">${l ? `In priority order. ${ent}.` : `Every list, nearest deadline first. ${ent}.`}</p></div>
+      <div class="row">${l ? `<button class="btn" data-act="list-rename" data-v="${l.id}">Rename list</button><button class="btn" data-act="list-del" data-v="${l.id}">Delete list</button>` : ""}<button class="btn primary" data-act="sub-new" data-v="${l ? l.id : ""}">+ Add submission</button></div></div>
+    ${n ? `<div class="tk-list">${items.map((x, i) => subRow(x, l ? i + 1 : 0, !l)).join("")}</div>`
+      : none ? `<div class="empty">Keep track of the journals, special issues, book chapter calls and conferences you might send a paper to: their deadlines, APC, Scopus indexing and where each one stands. Add the first one with + Add submission.</div>`
+      : `<div class="empty">${l ? "This list is empty. Add a submission to it, or move one here from its edit form." : "No submissions yet."}</div>`}
+  </div>`;
+}
+
+let SUBF = null; // the open submission form: {id, isNew, kind, indexing, topics, init}
+function showSubForm(id, listId){
+  const x = id ? getSub(id) : null; if (id && !x) return;
+  const lists = tkLists("submissions");
+  SUBF = {id:x ? x.id : uid(), isNew:!x, kind:x?.kind || "journal", indexing:x?.indexing || "unknown", topics:[...(x?.topics || [])]};
+  const d = x?.deadline || {}, c = x?.conf || {}, apc = x?.apc || {}, st = x?.status || "considering";
+  const inList = x ? x.list : listId && getList(listId) ? listId : S.ui.view === "subs" && getList(S.ui.tkList) ? S.ui.tkList : lists[0]?.id || "";
+  const val = s => `value="${esc(s ?? "")}"`;
+  const seg = (act, pairs, on, name) => `<div class="seg" role="group" aria-label="${name}">${pairs.map(([k, lb]) => `<button type="button" data-act="${act}" data-v="${k}" class="${k === on ? "on" : ""}" aria-pressed="${k === on}">${lb}</button>`).join("")}</div>`;
+  const m = $("#modal");
+  m.innerHTML = `<div class="mdl wide" role="dialog" aria-modal="true" aria-labelledby="mdl-h" id="sfForm">
+    <h2 id="mdl-h">${x ? "Edit submission" : "Add a place to submit"}</h2>
+    <div class="lbl">Kind${seg("sf-kind", SUB_KINDS, SUBF.kind, "Kind")}</div>
+    <label class="lbl" for="sfUrl">Link to the call or venue<input class="in" id="sfUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://…" ${val(x?.url)}></label>
+    <label class="lbl" for="sfTitle">Name<input class="in" id="sfTitle" autocomplete="off" placeholder="Journal, special issue, book or conference" ${val(x?.title)}></label>
+    <div class="lbl">Topics${tagEditor(SUBF.topics, "sub")}</div>
+    <div class="lbl">Indexing${seg("sf-index", SUB_INDEX, SUBF.indexing, "Indexing")}</div>
+    <div class="three"><label class="lbl" for="sfDue">Submission deadline<input class="in" id="sfDue" type="date" ${val(d.date)}></label>
+      <label class="lbl" for="sfTime">Time, optional<input class="in" id="sfTime" type="time" ${val(d.time)}></label>
+      <label class="chk" for="sfAoe"><input type="checkbox" id="sfAoe"${d.aoe ? " checked" : ""}> AoE (Anywhere on Earth)</label></div>
+    <div class="three"><label class="lbl" for="sfApc">APC<input class="in num" id="sfApc" inputmode="decimal" autocomplete="off" placeholder="e.g. 1800" ${val(Number.isFinite(apc.amount) ? apc.amount : "")}${apc.free ? " disabled" : ""}></label>
+      <label class="lbl" for="sfCur">Currency<input class="in num" id="sfCur" maxlength="3" autocomplete="off" spellcheck="false" placeholder="USD" ${val(apc.currency)}${apc.free ? " disabled" : ""}></label>
+      <label class="chk" for="sfFree"><input type="checkbox" id="sfFree"${apc.free ? " checked" : ""}> No APC</label></div>
+    <label class="lbl" for="sfZero">Free to publish until (zero-APC last date)<input class="in" id="sfZero" type="date" ${val(x?.zeroApcUntil)}></label>
+    <fieldset class="fs" id="sfConf"${SUBF.kind === "conference" ? "" : " hidden"}><legend>Conference</legend>
+      <div class="three"><label class="lbl" for="sfAbs">Abstract deadline<input class="in" id="sfAbs" type="date" ${val(c.abstract)}></label>
+        <label class="lbl" for="sfNotif">Notification<input class="in" id="sfNotif" type="date" ${val(c.notification)}></label>
+        <label class="lbl" for="sfCam">Camera-ready<input class="in" id="sfCam" type="date" ${val(c.cameraReady)}></label></div>
+      <div class="three"><label class="lbl" for="sfFrom">Conference starts<input class="in" id="sfFrom" type="date" ${val(c.from)}></label>
+        <label class="lbl" for="sfTo">Ends<input class="in" id="sfTo" type="date" ${val(c.to)}></label>
+        <label class="lbl" for="sfPlace">Place<input class="in" id="sfPlace" autocomplete="off" placeholder="City, or Online" ${val(c.place)}></label></div>
+    </fieldset>
+    <div class="two"><label class="lbl" for="sfStatus">Status<select class="in" id="sfStatus">${SUB_STATUS.map(([k, lb]) => `<option value="${k}"${k === st ? " selected" : ""}>${lb}</option>`).join("")}</select></label>
+      <label class="lbl" for="sfSubOn" id="sfSubWrap"${SENT.has(st) ? "" : " hidden"}>Submitted on<input class="in" id="sfSubOn" type="date" ${val(x?.submitted?.date)}></label></div>
+    <label class="lbl" for="sfList">List<select class="in" id="sfList">${lists.length ? lists.map(l => `<option value="${l.id}"${l.id === inList ? " selected" : ""}>${esc(l.name)}</option>`).join("") : `<option value="">Where to submit (a new list)</option>`}</select></label>
+    <label class="lbl" for="sfDetails">Details<textarea class="in" id="sfDetails" rows="4" placeholder="Scope, page limit, review time, who to contact. Markdown works.">${esc(x?.details || "")}</textarea></label>
+    <p class="hint" id="sfMsg" role="status"></p>
+    <div class="mdl-foot" id="sfFoot">${sfFoot(!!x)}</div>
+  </div>`;
+  m.hidden = false; SUBF.init = subSnap(); $(x ? "#sfTitle" : "#sfUrl").focus();
+}
+const sfFoot = editing => `${editing ? `<button class="btn ghost danger tk-del" data-act="sub-del">Delete</button>` : ""}<button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="sub-save">${editing ? "Save" : "Add submission"}</button>`;
+const subSnap = () => JSON.stringify([SUBF.kind, SUBF.indexing, SUBF.topics, [...document.querySelectorAll("#sfForm input.in:not(.tag-in), #sfForm select, #sfForm textarea")].map(i => i.value), [...document.querySelectorAll("#sfForm input[type=checkbox]")].map(i => i.checked)]);
+const subDirty = () => !!(SUBF && $("#sfForm") && subSnap() !== SUBF.init);
+function sfSeg(act, v){
+  SUBF[act === "sf-kind" ? "kind" : "indexing"] = v;
+  document.querySelectorAll(`[data-act="${act}"]`).forEach(b => { b.classList.toggle("on", b.dataset.v === v); b.setAttribute("aria-pressed", String(b.dataset.v === v)); });
+  if (act === "sf-kind") $("#sfConf").hidden = v !== "conference";
+}
+function sfChanged(t){
+  if (t.id === "sfStatus"){ const sent = SENT.has(t.value); $("#sfSubWrap").hidden = !sent; if (sent && !$("#sfSubOn").value) $("#sfSubOn").value = isoDay(Date.now()); }
+  if (t.id === "sfFree"){ $("#sfApc").disabled = $("#sfCur").disabled = t.checked; }
+}
+function subSave(){
+  const v = id => ($("#" + id)?.value || "").trim(), msg = $("#sfMsg"), url = v("sfUrl");
+  if (!SAFE_LINK.test(url)){ msg.textContent = "Paste the link to the call or venue, starting with https://"; $("#sfUrl").focus(); return; }
+  const amt = v("sfApc").replace(/[,\s]/g, "");
+  if (!$("#sfFree").checked && amt && !Number.isFinite(+amt)){ msg.textContent = "Write the APC as a number, like 1800."; $("#sfApc").focus(); return; }
+  const tagIn = $("#tagIn-sub"); if (tagIn && normTag(tagIn.value)) addTag("sub", tagIn.value);   // a topic typed but not yet added
+  const old = getSub(SUBF.id), was = old ? old.list : null, st = v("sfStatus");
+  let l = getList(v("sfList")); if (!l) l = newList("submissions", "Where to submit");
+  const x = Object.assign(old || {id:SUBF.id, addedAt:Date.now()}, {
+    list:l.id, kind:SUBF.kind, title:v("sfTitle") || linkHost(url), url, topics:SUBF.topics.slice(), indexing:SUBF.indexing,
+    deadline:{date:v("sfDue"), time:v("sfTime"), aoe:$("#sfAoe").checked},
+    apc:$("#sfFree").checked ? {free:true} : amt ? {amount:+amt, currency:(v("sfCur") || "USD").toUpperCase()} : null,
+    zeroApcUntil:v("sfZero"),
+    conf:SUBF.kind === "conference" ? {abstract:v("sfAbs"), notification:v("sfNotif"), cameraReady:v("sfCam"), from:v("sfFrom"), to:v("sfTo"), place:v("sfPlace")} : (old?.conf || null),
+    status:st, submitted:SENT.has(st) ? {date:v("sfSubOn") || isoDay(Date.now()), paper:old?.submitted?.paper ?? null} : null,
+    details:$("#sfDetails").value.trim(), updatedAt:Date.now()});
+  if (was && was !== l.id){ const pl = getList(was); if (pl) pl.order = (pl.order || []).filter(i => i !== x.id); }
+  if (!(l.order || (l.order = [])).includes(x.id)) l.order.push(x.id);
+  if (!old) TK.submissions.push(x);
+  tsave(); SUBF = null; closeModal();
+  if (S.ui.view !== "subs" || (S.ui.tkList !== "all" && S.ui.tkList !== l.id)){ closeReader(); S.ui.view = "subs"; S.ui.tkList = l.id; save(); }
+  renderAll();
+  toast(old ? `Saved “${x.title}”` : `Added “${x.title}” to ${l.name}`);
+}
+function subDelete(){
+  const x = getSub(SUBF && SUBF.id); if (!x) return closeModal();
+  TK.submissions = TK.submissions.filter(y => y.id !== x.id);
+  const l = getList(x.list); if (l) l.order = (l.order || []).filter(i => i !== x.id);
+  tsave(); SUBF = null; closeModal(); renderAll(); toast(`Deleted “${x.title}”`);
+}
+function subMark(id){
+  const x = getSub(id); if (!x) return;
+  x.status = "submitted"; x.submitted = {date:isoDay(Date.now()), paper:x.submitted?.paper ?? null}; x.updatedAt = Date.now();
+  tsave(); renderAll(); toast(`Marked “${x.title}” as submitted today. Change the date in its edit form.`);
+}
+
+let LISTF = null; // the open list form: {section, id}
+function showListForm(section, id){
+  const l = id ? getList(id) : null; LISTF = {section, id:l ? l.id : null};
+  const m = $("#modal");
+  m.innerHTML = `<div class="mdl" role="dialog" aria-modal="true" aria-labelledby="mdl-h">
+    <h2 id="mdl-h">${l ? "Rename list" : "New list"}</h2>
+    ${l ? "" : `<p>${section === "submissions" ? "For example Q1 journals, Conferences 2027 or Free until March." : "For example Research, Side projects or Thesis."} Order it by priority once it has entries.</p>`}
+    <label class="lbl" for="lfName">Name<input class="in" id="lfName" autocomplete="off" ${l ? `value="${esc(l.name)}"` : ""}></label>
+    <p class="hint" id="lfMsg" role="status"></p>
+    <div class="mdl-foot"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="list-save">${l ? "Rename" : "Create list"}</button></div>
+  </div>`;
+  m.hidden = false; const i = $("#lfName"); i.focus(); i.select();
+}
+function listSave(){
+  const name = ($("#lfName")?.value || "").trim(); if (!LISTF) return;
+  if (!name){ $("#lfMsg").textContent = "Give the list a name."; $("#lfName").focus(); return; }
+  const l = LISTF.id ? getList(LISTF.id) : newList(LISTF.section, name); if (!l) return closeModal();
+  l.name = name; tsave(); const sec = LISTF.section; closeModal();
+  closeReader(); S.ui.view = sec === "projects" ? "projects" : "subs"; S.ui.tkList = l.id; save(); renderAll();
+}
+function showListDelete(id){
+  const l = getList(id); if (!l) return; const n = listItems(l).length;
+  const m = $("#modal");
+  m.innerHTML = `<div class="mdl" role="dialog" aria-modal="true" aria-labelledby="mdl-h">
+    <h2 id="mdl-h">Delete “${esc(l.name)}”?</h2>
+    <p>${n ? `This also deletes the <b class="num">${n}</b> ${n === 1 ? "entry" : "entries"} in it. To keep ${n === 1 ? "it" : "them"}, move ${n === 1 ? "it" : "them"} to another list from the edit form first.` : "The list is empty."}</p>
+    <div class="mdl-foot"><button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="list-del-yes" data-v="${l.id}">Delete list</button></div>
+  </div>`;
+  m.hidden = false; m.querySelector(".btn.primary").focus();
+}
+function listDelete(id){
+  const l = getList(id); if (!l) return closeModal();
+  const coll = l.section === "projects" ? "projects" : "submissions", n = TK[coll].filter(x => x.list === l.id).length;
+  TK[coll] = TK[coll].filter(x => x.list !== l.id); TK.lists = TK.lists.filter(x => x.id !== l.id);
+  tsave(); closeModal(); S.ui.tkList = "all"; save(); renderAll();
+  toast(`Deleted the list “${l.name}”${n ? ` and its ${n} ${n === 1 ? "entry" : "entries"}` : ""}`);
+}
+
 /* ---------------- tag picker ---------------- */
 // The tag box suggests tags already in the library: most used first when empty, matches (prefix first) as you type.
 // Enter or comma adds the selected suggestion, or the typed text as a new tag; Backspace in an empty box removes the last tag.
 const normTag = s => String(s || "").trim().toLowerCase().replace(/,/g, "").replace(/\s+/g, "-").replace(/^-+|-+$/g, "");
 let TS = null; // open suggestion list: {inp, opts:[tag], i}
-function tagCounts(){ const c = {}; S.papers.forEach(p => p.tags.forEach(t => c[t] = (c[t] || 0) + 1)); return c; }
-function tagList(kind){ return kind === "draft" ? (LINK ? LINK.tags : null) : kind === "paper" && R ? getP(R.id).tags : null; }
+function tagCounts(kind){ // a submission's topics are suggested from other submissions and from paper tags
+  const c = {}, add = t => c[t] = (c[t] || 0) + 1;
+  S.papers.forEach(p => p.tags.forEach(add));
+  if (kind === "sub") TK.submissions.forEach(x => (x.topics || []).forEach(add));
+  return c;
+}
+function tagList(kind){ return kind === "draft" ? (LINK ? LINK.tags : null) : kind === "paper" && R ? getP(R.id).tags : kind === "sub" ? (SUBF ? SUBF.topics : null) : null; }
 function tagEditor(tags, kind){
   return `<div class="tags-ed" data-tags-of="${kind}">${tags.map(t => `<span class="tag">${esc(t)}<button type="button" data-act="tag-del" data-k="${kind}" data-v="${esc(t)}" aria-label="Remove tag ${esc(t)}">×</button></span>`).join("")}
     <span class="tag-pick"><input class="in tag-in" id="tagIn-${kind}" data-tags="${kind}" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="tagSug-${kind}" autocomplete="off" spellcheck="false" placeholder="${tags.length ? "add tag" : "add a tag"}" aria-label="Add a tag"><div class="tag-sug" id="tagSug-${kind}" role="listbox" aria-label="Tags in your library" hidden></div></span></div>`;
 }
 function tagSuggest(inp){
-  const kind = inp.dataset.tags, have = tagList(kind) || [], c = tagCounts(), box = $(`#tagSug-${kind}`); if (!box) return;
+  const kind = inp.dataset.tags, have = tagList(kind) || [], c = tagCounts(kind), box = $(`#tagSug-${kind}`); if (!box) return;
   const q = normTag(inp.value), fq = fold(q);
   const items = Object.keys(c).filter(t => !have.includes(t) && (!fq || fold(t).includes(fq)))
     .sort((a, b) => (fq ? (fold(b) === fq) - (fold(a) === fq) || fold(b).startsWith(fq) - fold(a).startsWith(fq) : 0) || c[b] - c[a] || a.localeCompare(b)).slice(0, 8);
@@ -1732,7 +1963,7 @@ function tagSuggest(inp){
   TS = {inp, opts, i};
   box.innerHTML = opts.map((t, k) => k === items.length
     ? `<button type="button" role="option" id="ts-${kind}-${k}" class="ts-i ts-new" data-act="tag-pick" data-k="${kind}" data-v="${esc(t)}">New tag <b>${esc(t)}</b></button>`
-    : `<button type="button" role="option" id="ts-${kind}-${k}" class="ts-i" data-act="tag-pick" data-k="${kind}" data-v="${esc(t)}"><span class="num" aria-hidden="true">#</span>${esc(t)}<span class="ct num" title="${c[t]} ${c[t] === 1 ? "paper" : "papers"}">${c[t]}</span></button>`).join("");
+    : `<button type="button" role="option" id="ts-${kind}-${k}" class="ts-i" data-act="tag-pick" data-k="${kind}" data-v="${esc(t)}"><span class="num" aria-hidden="true">#</span>${esc(t)}<span class="ct num" title="Used ${c[t]} ${c[t] === 1 ? "time" : "times"}">${c[t]}</span></button>`).join("");
   box.hidden = false; inp.setAttribute("aria-expanded", "true");
   markTagSug();
 }
@@ -1844,6 +2075,20 @@ document.addEventListener("click", async e => {
     case "tag-pick": addTag(t.dataset.k, v); break;
     case "remove": $("#rmWrap").innerHTML = `<span style="font-size:12px">Remove paper, notes and history?</span> <button class="btn sm danger" data-act="remove-yes">Remove</button> <button class="btn sm ghost" data-act="tab" data-v="details">Cancel</button>`; break;
     case "remove-yes": { const id = R.id; R.session = null; closeReader(); S.papers = S.papers.filter(x => x.id !== id); idb.del(id); S.ui.view = "library"; save(); renderAll(); toast("Removed from library"); break; }
+    case "tk-subs": closeReader(); S.ui.view = "subs"; S.ui.tkList = v; save(); renderAll(); break;
+    case "sub-new": showSubForm(null, v); break;
+    case "sub-edit": showSubForm(v); break;
+    case "sub-save": subSave(); break;
+    case "sub-del": $("#sfFoot").innerHTML = `<span class="tk-confirm">Delete this entry? This can't be undone.</span><button class="btn ghost" data-act="sub-del-no">Keep it</button><button class="btn primary" data-act="sub-del-yes">Delete</button>`; $("#sfFoot .btn.primary").focus(); break;
+    case "sub-del-no": $("#sfFoot").innerHTML = sfFoot(true); break;
+    case "sub-del-yes": subDelete(); break;
+    case "sub-mark": subMark(v); break;
+    case "sf-kind": case "sf-index": sfSeg(a, v); break;
+    case "list-new": showListForm(v); break;
+    case "list-rename": showListForm(getList(v)?.section || "submissions", v); break;
+    case "list-save": listSave(); break;
+    case "list-del": showListDelete(v); break;
+    case "list-del-yes": listDelete(v); break;
     case "clear-examples": closeReader(); S.papers = S.papers.filter(x => !x.sample); S.ui.view = S.papers.length ? "library" : "home"; S.ui.filter = "all"; save(); renderAll(); toast("Examples removed"); break;
   }
 });
@@ -1853,6 +2098,7 @@ document.addEventListener("input", e => {
   if (t.id === "q"){ S.ui.q = t.value; if (S.ui.view !== "library"){ closeReader(); S.ui.view = "library"; S.ui.filter = "all"; renderMain(); renderSide(); const q = $("#q"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); } else renderMain(); saveSoon(); return; }
   if (t.id === "lkUrl"){ linkUrlChanged(); return; }
   if (t.id === "lkBib"){ linkBibChanged(); return; }
+  if (t.id === "sfStatus" || t.id === "sfFree"){ sfChanged(t); return; }
   if (t.classList.contains("tag-in")){ if (t.value.includes(",")){ addTag(t.dataset.tags, t.value); } else tagSuggest(t); return; } // comma pasted or typed on mobile keyboards
   if (!R) return; const p = getP(R.id);
   if (t.id === "noteTa"){ p.notes = t.value; saveSoon(); }
@@ -1862,7 +2108,8 @@ document.addEventListener("input", e => {
 document.addEventListener("keydown", e => {
   const t = e.target;
   if (t.classList && t.classList.contains("tag-in") && tagKey(e, t)) return;
-  if (e.key === "Escape" && !$("#modal").hidden){ if (linkDirty()){ $("#lkMsg").textContent = "Press Cancel to discard what you've typed."; return; } closeModal(); return; }
+  if (e.key === "Escape" && !$("#modal").hidden){ if (formDirty()){ ($("#lkMsg") || $("#sfMsg")).textContent = "Press Cancel to discard what you've typed."; return; } closeModal(); return; }
+  if (t.id === "lfName" && e.key === "Enter"){ e.preventDefault(); listSave(); return; }
   if (t.id === "idIn" && e.key === "Enter"){ e.preventDefault(); addById(); return; }
   if (e.altKey && e.key === "ArrowLeft" && R && R.hist.length){ e.preventDefault(); goBack(); return; }  // instead of leaving the page
   if (R && R.editSess && t.closest && t.closest(".sess-form")){
@@ -1888,7 +2135,8 @@ let rzT; window.addEventListener("resize", () => { clearTimeout(rzT); rzT = setT
 
 $("#fileIn").addEventListener("change", e => { importFiles(e.target.files); e.target.value = ""; });
 $("#impIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) startImport(f); });
-$("#modal").addEventListener("click", e => { if (e.target.id === "modal" && !linkDirty()) closeModal(); });
+const formDirty = () => linkDirty() || subDirty();
+$("#modal").addEventListener("click", e => { if (e.target.id === "modal" && !formDirty()) closeModal(); });
 $("#attachIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) attachFile(f); });
 let dragN = 0;
 window.addEventListener("dragenter", e => { if ([...(e.dataTransfer?.types||[])].includes("Files")){ dragN++; $("#drop").hidden = false; } });
@@ -1945,7 +2193,7 @@ async function boot(){
       try { localStorage.setItem(LEFTKEY, "1"); } catch(e){}
     }
   } else { S = load() || seed(); TK = loadTracker(); }
-  S.ui = Object.assign({view:"home", filter:"all", tab:"notes", nmode:"preview", hlFilter:"all", zoom:1, q:""}, S.ui || {});
+  S.ui = Object.assign({view:"home", filter:"all", tab:"notes", nmode:"preview", hlFilter:"all", zoom:1, q:"", tkList:"all"}, S.ui || {});
   if (S.ui.view === "reader") S.ui.view = "home";
   renderAll();
   if (note) toast(note);

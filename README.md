@@ -148,6 +148,17 @@ The overview turns your sessions into a picture of your reading:
 - **Revision queue**: highlights from finished papers come back each day, so ideas don't fade.
 - **Reading log**: every session, newest first.
 
+## Track where to submit
+
+Keep the calls you collect in one place: journals, special issues, book chapter calls and conferences you might send a paper to.
+
+- **Everything about a call:** its link, the submission deadline (with a time and AoE if you like), APC or *No APC*, the zero-APC last date, Scopus or not, topics and your notes. Conferences add abstract, notification and camera-ready dates, plus when and where.
+- **Deadlines you can't miss:** each entry counts down ("in 5 days"), flags deadlines a week away or closer, and says when one has closed.
+- **Your own lists, in priority order:** make as many as you like (*Q1 journals*, *Conferences 2027*, *Free until March*). *All submissions* shows every list, nearest deadline first.
+- **Mark as submitted** in one click, then follow it from *Considering* to *Accepted* or *Rejected*.
+
+Submissions are saved in `tracker.json` in your library folder. *Export library* doesn't include them yet.
+
 ## Back up and move your library
 
 - **Export library** saves everything in one `.zip`: your PDFs, highlights, comments, notes, sessions and bookmarks, plus a readable Markdown file for every paper with its link, abstract, notes and highlights.

@@ -140,7 +140,7 @@ One commit per step, pushed, shown working (e2e + screenshot). Docs in one commi
 Each step leaves the app working, so building can stop after any of them.
 
 - [x] 1. `tracker.json` store, `/api/tracker`, merge, browser-storage fallback, unit tests (no UI yet)
-- [ ] 2. Lists and submissions: add, edit, delete, mark as submitted
+- [x] 2. Lists and submissions: add, edit, delete, mark as submitted. Sidebar *Submissions* section, list view (`subsHTML`), form (`showSubForm` / `subSave`), list create/rename/delete. Test: `scripts/e2e/trackers.mjs`
 - [ ] 3. Reorder by drag, filters
 - [ ] 4. Projects: page, update log, next step, milestones, links, stale marker
 - [ ] 5. My papers, and linking them to submissions and projects
