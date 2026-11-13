@@ -50,7 +50,8 @@ Up to 1.1.1 the package was `pdfdesk`; from 1.2.0 it is `studydesk` (D-013).
 - [x] **1.1.0**: add by link without the PDF, tag suggestions, abstracts (on PyPI)
 - [x] **1.1.1**: last `pdfdesk` release. Ships the README/About wording from b0de801 and a notice that PDFDesk is now StudyDesk; github.com/shubham10divakar/pdfdesk is frozen there
 - [x] **1.2.0**: renamed to StudyDesk (`studydesk` on PyPI); an existing `~/PDFDesk` library is used as it is
-- [x] **1.3.0**: trackers for submissions, projects and my papers, with Upcoming; the library folder is always `~/StudyDesk` (D-015)
+- [x] **1.3.0**: trackers for submissions, projects and my papers, with Upcoming; the library folder is always `~/StudyDesk` (D-015) (tagged, never uploaded to PyPI)
+- [x] **1.3.1**: README and PyPI page say clearly that PDFDesk is now StudyDesk, with what's new and how to move over; same app as 1.3.0
 - [ ] **2.x**: platform wheels carrying the Tauri binary (Windows x64, macOS x64 + arm64, Linux x64), built in CI; `studydesk` launches the app. Consider pytauri if the backend should be Python
 - [ ] 2.x first run: offer to import a 1.x export file (or read the 1.x library folder directly)
 - [ ] Optional native installers (`.msi`, `.dmg`) alongside pip

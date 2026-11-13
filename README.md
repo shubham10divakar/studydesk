@@ -2,9 +2,11 @@
 
 # StudyDesk
 
-### Your reading desk for research papers.
+### Your desk for research: the papers you read, the venues you submit to, the projects you build.
 
-**Library, PDF reader, highlights, notes, and a complete log of your reading, all in one window, all on your machine.**
+**Library, PDF reader, highlights, notes, a complete log of your reading, and trackers for submissions, projects and your own papers, all in one window, all on your machine.**
+
+**📣 PDFDesk is now StudyDesk, with loads of new features.**
 
 [![PyPI](https://img.shields.io/pypi/v/studydesk?color=2f55d4&label=pypi)](https://pypi.org/project/studydesk/)
 [![Downloads](https://img.shields.io/pepy/dt/studydesk?label=downloads)](https://pepy.tech/projects/studydesk)
@@ -20,17 +22,26 @@ pip install studydesk && studydesk
 
 </div>
 
-> [!NOTE]
-> **StudyDesk was called PDFDesk.** It is growing from a PDF reader into a desk for everything you study: links, PDFs, documents and notes. Coming from `pdfdesk`? Install with `pip install studydesk`, then rename your `PDFDesk` folder (in your home folder) to `StudyDesk` before starting it, or start with `studydesk --data-dir ~/PDFDesk`. Nothing to export. `pdfdesk` 1.1.1 was the last release under the old name.
+## 📣 PDFDesk is now StudyDesk
+
+`pdfdesk` has been renamed **`studydesk`**, and it does a lot more than read PDFs now. `pdfdesk` 1.1.1 was the last release under the old name; every new version ships here.
+
+### What's new since PDFDesk (1.3)
+- 🗓️ **Submissions tracker:** journals, special issues, book chapter calls and conferences, with deadlines (AoE too), APC and zero-APC dates, Scopus or not, and your own priority-ordered lists.
+- 🛠️ **Projects tracker:** a dated update log, next step, milestones, GitHub and other links, and a nudge when a project goes quiet.
+- ✍️ **My papers:** your own manuscripts, aimed at a 1st, 2nd and 3rd choice venue and followed to the decision.
+- ⏰ **Upcoming:** every deadline and milestone in one list, nearest first, also on the Overview.
+- 🖼️ **Images** on submissions and projects (paste a screenshot of a call or a flyer).
+- 📦 **Export and import carry everything**, trackers included.
+
+### Moving from PDFDesk takes a minute
+1. `pip uninstall pdfdesk` (optional), then `pip install studydesk`.
+2. Rename the `PDFDesk` folder in your home folder to `StudyDesk`. If you already started StudyDesk once, delete the new `StudyDesk` folder first (it holds only the example papers). Or leave everything where it is and start with `studydesk --data-dir ~/PDFDesk`.
+3. Run `studydesk`. Your papers, PDFs, highlights, notes and reading history are all there; nothing to export or import.
+
+Old PDFDesk export files import as they are. The old repo, [shubham10divakar/pdfdesk](https://github.com/shubham10divakar/pdfdesk), is no longer updated.
 
 ---
-
-## New in 1.3: trackers for your submissions and projects
-
-- 🗓️ **Submissions:** the journals, special issues, book chapter calls and conferences you might submit to, with deadlines (AoE too), APC and zero-APC dates, Scopus or not, your own priority-ordered lists, and *Mark as submitted*.
-- 🛠️ **Projects:** a dated log of updates, next step, milestones, GitHub and other links, and a nudge when an active project goes quiet.
-- ✍️ **My papers:** your own manuscripts, aimed at a 1st, 2nd and 3rd choice and followed to the decision.
-- ⏰ **Upcoming:** every date across them, nearest first, also on the Overview.
 
 ## New in 1.1
 

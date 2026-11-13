@@ -2,6 +2,10 @@
 
 All notable changes to StudyDesk (called PDFDesk up to 1.1.1). Versions follow [semantic versioning](https://semver.org/); dates are release dates.
 
+## 1.3.1 (2026-11-13)
+
+- **README says clearly that PDFDesk is now StudyDesk**, lists what's new since PDFDesk and how to move over in three steps. This is also the PyPI page. Same app as 1.3.0, which was tagged but not uploaded to PyPI.
+
 ## 1.3.0 (2026-11-13)
 
 - **Your library folder is always `StudyDesk`.** StudyDesk no longer uses a `~/PDFDesk` folder (or `PDFDESK_DATA`) by itself. Coming from PDFDesk: rename `PDFDesk` in your home folder to `StudyDesk`, or start with `studydesk --data-dir ~/PDFDesk`. Until you do, `studydesk` prints a reminder each time it starts.
