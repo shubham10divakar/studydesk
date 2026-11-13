@@ -158,7 +158,17 @@ Keep the calls you collect in one place: journals, special issues, book chapter 
 - **Filters:** kind, Scopus or not, status (*Not submitted yet*, *Submitted or later*, or one status), topic, and *Free to publish now* (no APC, or still before the zero-APC date).
 - **Mark as submitted** in one click, then follow it from *Considering* to *Accepted* or *Rejected*.
 
-Submissions are saved in `tracker.json` in your library folder. *Export library* doesn't include them yet.
+## Keep your projects moving
+
+A *Projects* section for everything you're working on: research, software, open source, courses.
+
+- **Where it stands, at a glance:** each project keeps a dated log of updates ("Released 1.2.0 on PyPI"). The newest line shows on its card with how long ago it was, and status changes (*Idea*, *Planning*, *Active*, *Blocked*, *Paused*, *Done*, *Dropped*) are logged too.
+- **What's next:** a next step with a due date, and milestones you tick off. Ones due within a week are flagged on the card.
+- **All its links in one place:** the GitHub repository (shown as `owner/name`) and any others you add: docs, demo, PyPI, Overleaf, dataset.
+- **Nothing forgotten:** an active project with no update in 14 days is marked, and a filter lists them all.
+- Version, start and target dates, tags, people and Markdown notes; your own lists in priority order, like submissions.
+
+Submissions and projects are saved in `tracker.json` in your library folder. *Export library* doesn't include them yet.
 
 ## Back up and move your library
 

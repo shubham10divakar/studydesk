@@ -350,6 +350,14 @@ function renderSide(){
         <button class="nav-i nav-add" data-act="list-new" data-v="submissions">+ New list</button>
       </nav>
     </div>
+    <div>
+      <div class="nav-h">Projects</div>
+      <nav class="nav tk-nav pj-nav">
+        <button class="nav-i ${S.ui.view==="projects"&&!(getList(S.ui.tkList)?.section==="projects")?"on":""}" data-act="tk-projs" data-v="all">All projects<span class="ct">${TK.projects.length}</span></button>
+        ${tkLists("projects").map(l => `<button class="nav-i ${(S.ui.view==="projects"&&S.ui.tkList===l.id)||(S.ui.view==="project"&&getProj(S.ui.tkItem)?.list===l.id)?"on":""}" data-act="tk-projs" data-v="${l.id}"><span class="tk-li">${esc(l.name)}</span>${l.order && TK.projects.some(x => x.list === l.id && isStale(x)) ? '<span class="tk-dot" title="A project here has had no update for a while"></span>' : ""}<span class="ct">${listItems(l).length}</span></button>`).join("")}
+        <button class="nav-i nav-add" data-act="list-new" data-v="projects">+ New list</button>
+      </nav>
+    </div>
     <div class="nav tagsnav">
       <div class="nav-h">Tags</div>
       ${Object.entries(tags).sort((a,b)=>b[1]-a[1]).map(([t,c]) => `<button class="nav-i ${f==="tag:"+t?"on":""}" data-act="filter" data-v="tag:${esc(t)}"><span class="num" style="color:var(--faint)">#</span>${esc(t)}<span class="ct">${c}</span></button>`).join("")}
@@ -469,7 +477,7 @@ function libHTML(){
 
 function renderMain(){
   const m = $("#main"); m.classList.remove("is-reader");
-  m.innerHTML = S.ui.view === "library" ? libHTML() : S.ui.view === "about" ? aboutHTML() : S.ui.view === "subs" ? subsHTML() : homeHTML();
+  m.innerHTML = S.ui.view === "library" ? libHTML() : S.ui.view === "about" ? aboutHTML() : S.ui.view === "subs" ? subsHTML() : S.ui.view === "projects" ? projsHTML() : S.ui.view === "project" ? projectHTML() : homeHTML();
   m.scrollTop = 0;
 }
 function renderAll(){ renderSide(); if (S.ui.view === "reader" && R) renderPanel(); else renderMain(); applyLayout(); }
@@ -555,6 +563,13 @@ const FEATURES = [
     "Your own lists, each in priority order: drag an entry by its number, or use the arrows or Alt+↑ / Alt+↓",
     "All submissions shows every list by nearest deadline; filter by kind, Scopus, status, topic or free to publish now",
     "Mark as submitted in one click; status runs from Considering to Accepted or Rejected"]],
+  ["Projects", [
+    "Keep what you're working on in your own lists, in priority order",
+    "A dated update log: the newest line shows on the card with how long ago it was; status changes are logged too",
+    "Next step with a due date, and milestones you tick off; ones due within a week are flagged",
+    "GitHub repository shown as owner/name, plus any other links: docs, demo, PyPI, Overleaf, dataset",
+    "Version, start and target dates, tags, people and Markdown notes",
+    "Active projects with no update in 14 days are marked, and a filter finds them"]],
   ["Export and import", [
     "Export the whole library as one .zip: PDFs, highlights, notes, sessions, plus a readable Markdown file per paper with its link and abstract",
     "A small backup without PDFs for frequent saves",
@@ -631,6 +646,7 @@ const ICON = {
   sideR:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M10 3v10"/></svg>',
   up:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 10 4-4 4 4"/></svg>',
   down:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 6 4 4 4-4"/></svg>',
+  code:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m5.5 4.5-3.5 3.5 3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/></svg>',
   bmOn:'<svg viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1.6"><path d="M4 2.5h8v11L8 10.5l-4 3z"/></svg>'
 };
 
@@ -1224,7 +1240,7 @@ function showImportDialog(step){
 function closeModal(){
   const m = $("#modal"); m.hidden = true; m.innerHTML = ""; IMP = null;
   if (LINK && LINK.hasFile && !LINK.saved) idb.del(LINK.id);   // Add by link looked up an arXiv PDF, then was cancelled
-  LINK = null; SUBF = null; LISTF = null;
+  LINK = null; SUBF = null; LISTF = null; PF = null;
 }
 
 function mergeInto(cur, inc, stamp){
@@ -1990,6 +2006,179 @@ function listDelete(id){
   toast(`Deleted the list “${l.name}”${n ? ` and its ${n} ${n === 1 ? "entry" : "entries"}` : ""}`);
 }
 
+/* ---------------- projects tracker ---------------- */
+// What you're working on (spec: docs/trackers.md § Projects). The card's "last update" is the newest line of the
+// project's dated update log; a status change adds a line by itself. Active projects with no update in STALE_DAYS
+// are marked. Lists, order and reordering are shared with the submissions tracker.
+const PROJ_KINDS = [["research","Research"],["software","Software"],["opensource","Open source"],["course","Course"],["work","Work"],["personal","Personal"]];
+const PROJ_STATUS = [["idea","Idea","--s-inbox"],["planning","Planning","--s-planned"],["active","Active","--s-reading"],["blocked","Blocked","--s-revisit"],["paused","Paused","--s-paused"],["done","Done","--s-completed"],["dropped","Dropped","--faint"]];
+const STALE_DAYS = 14;
+const projPill = s => { const st = PROJ_STATUS.find(x => x[0] === s) || PROJ_STATUS[0]; return `<span class="pill" style="--c:var(${st[2]})">${st[1]}</span>`; };
+const getProj = id => TK.projects.find(x => x.id === id);
+const lastTouch = p => Math.max(p.addedAt || 0, ...(p.updates || []).map(u => u.at || 0));
+const staleDays = p => p.status === "active" ? Math.floor((day0() - day0(lastTouch(p))) / DAY) : 0;
+const isStale = p => staleDays(p) >= STALE_DAYS;
+// GitHub links show as owner/name; anything else that isn't a github.com repo shows its host.
+function repoName(u){ const m = /^https?:\/\/(?:www\.)?github\.com\/([^/\s]+)\/([^/\s#?]+)/i.exec(u || ""); return m ? `${m[1]}/${m[2].replace(/\.git$/i, "")}` : ""; }
+const updText = u => u.status ? `Status changed to ${labelOf(PROJ_STATUS, u.status)}${u.text ? `: ${u.text}` : ""}` : u.text;
+const nextMilestone = p => (p.milestones || []).filter(m => !m.done && isDate(m.due)).sort((a, b) => a.due.localeCompare(b.due))[0] || null;
+const mdPlain = src => md(src || "").replace(/<button class="pref" data-act="goto" data-v="\d+">([^<]*)<\/button>/g, '<span class="pref">$1</span>');   // no pages to jump to here
+
+function projLinks(p, cls){
+  const out = [];
+  if (p.github && SAFE_LINK.test(p.github)) out.push(`<a class="${cls}" href="${esc(p.github)}" target="_blank" rel="noopener" title="Open the repository">${ICON.code}${esc(repoName(p.github) || linkHost(p.github))} ↗</a>`);
+  (p.links || []).forEach(l => { if (l && SAFE_LINK.test(l.url || "")) out.push(`<a class="${cls}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label || linkHost(l.url))} ↗</a>`); });
+  return out.join("");
+}
+
+function projRow(p, rank, showList, moves){
+  const u = (p.updates || [])[0], l = getList(p.list), ms = nextMilestone(p), st = staleDays(p);
+  const msTxt = ms ? (() => { const t = dayAt(ms.due), d = daysTo(t); return `<span class="${d < 0 ? "over" : d <= 7 ? "warn" : ""}">Milestone: ${esc(ms.title)}, ${d < 0 ? `${-d} days overdue` : d === 0 ? "due today" : `due ${fmtDate(t)}`}</span>`; })() : "";
+  const meta = [projLinks(p, "tk-lk"), p.version ? `<span class="num">v${esc(p.version.replace(/^v/i, ""))}</span>` : "", msTxt, showList && l ? `<span>in ${esc(l.name)}</span>` : ""].filter(Boolean);
+  return `<div class="tk-row${rank ? "" : " no-rank"}" data-id="${p.id}">
+    ${rank ? rankCell(p, rank, moves) : ""}
+    <div class="tk-body">
+      <div class="tk-top"><span class="tk-kind">${labelOf(PROJ_KINDS, p.kind)}</span>${projPill(p.status)}${isStale(p) ? `<span class="tk-stale" title="Active, but nothing logged for ${st} days">No update in ${st} days</span>` : ""}</div>
+      <button class="tk-t" data-act="proj-open" data-v="${p.id}">${esc(p.name || "Untitled project")}</button>
+      ${p.summary ? `<p class="tk-d">${esc(p.summary)}</p>` : ""}
+      <div class="pj-last">${u ? `<span class="pj-when num">${rel(u.at)}</span><span class="pj-txt">${esc(updText(u))}</span>` : `<span class="pj-txt none">No updates yet</span>`}</div>
+      ${p.next && p.next.text ? `<div class="pj-next"><b>Next:</b> ${esc(p.next.text)}${isDate(p.next.due) ? ` <span class="num">by ${fmtDate(dayAt(p.next.due))}</span>` : ""}</div>` : ""}
+      ${meta.length ? `<div class="tk-m">${meta.join("")}</div>` : ""}
+    </div>
+  </div>`;
+}
+
+const TPF0 = {kind:"", st:""};
+const tpF = () => Object.assign({}, TPF0, S.ui.tpF || {});
+const PROJ_ORDER = ["active","blocked","planning","idea","paused","done","dropped"];
+function projsHTML(){
+  const l = S.ui.tkList !== "all" ? getList(S.ui.tkList) : null, f = tpF();
+  const scope = l && l.section === "projects" ? listItems(l)
+    : TK.projects.slice().sort((a, b) => PROJ_ORDER.indexOf(a.status) - PROJ_ORDER.indexOf(b.status) || lastTouch(b) - lastTouch(a));
+  const items = scope.filter(p => (!f.kind || p.kind === f.kind) && (!f.st || (f.st === "going" ? ["active","blocked","planning"].includes(p.status) : f.st === "stale" ? isStale(p) : p.status === f.st)));
+  const n = items.length, all = scope.length, rank = new Map(scope.map((x, i) => [x.id, i + 1]));
+  const ent = k => `<span class="num">${k}</span> ${k === 1 ? "project" : "projects"}`;
+  const count = n === all ? `${ent(n)}.` : `Showing <span class="num">${n}</span> of ${ent(all)}.`;
+  const sel = (id, key, label, opts) => `<label class="flt" for="${id}"><span class="vh">${label}</span><select class="in" id="${id}" data-tpf="${key}">${opts.map(([k, lb]) => `<option value="${k}"${k === f[key] ? " selected" : ""}>${esc(lb)}</option>`).join("")}</select></label>`;
+  const bar = all ? `<div class="tk-flt" role="group" aria-label="Filter projects">${sel("tpKind", "kind", "Kind", [["", "All kinds"], ...PROJ_KINDS])}${sel("tpSt", "st", "Status", [["", "Any status"], ["going", "In progress (active, blocked, planning)"], ["stale", `No update in ${STALE_DAYS}+ days`], ...PROJ_STATUS.map(s => [s[0], s[1]])])}${f.kind || f.st ? `<button class="btn sm ghost" data-act="tpf-clear">Clear filters</button>` : ""}</div>` : "";
+  const ordered = !!(l && l.section === "projects");
+  return `<div class="wrap">
+    <div class="head-row"><div><div class="eyebrow">Projects</div><h1 class="page-h">${ordered ? esc(l.name) : "All projects"}</h1>
+      <p class="sub">${ordered ? `In priority order. ${count}` : `Active first, then by latest update. ${count}`}</p></div>
+      <div class="row">${ordered ? `<button class="btn" data-act="list-rename" data-v="${l.id}">Rename list</button><button class="btn" data-act="list-del" data-v="${l.id}">Delete list</button>` : ""}<button class="btn primary" data-act="proj-new" data-v="${ordered ? l.id : ""}">+ Add project</button></div></div>
+    ${bar}
+    ${n ? `<div class="tk-list${ordered ? " ordered" : ""}">${items.map((p, i) => projRow(p, ordered ? rank.get(p.id) : 0, !ordered, [i > 0, i < n - 1])).join("")}</div>`
+      : all ? `<div class="empty">No projects here match these filters. <button class="path-link" data-act="tpf-clear">Clear filters</button></div>`
+      : `<div class="empty">${ordered ? "This list is empty. Add a project to it, or move one here from its edit form." : "Keep each thing you're working on in one place: its status, a dated log of what happened, the next step, milestones, and its GitHub and other links. Add the first one with + Add project."}</div>`}
+  </div>`;
+}
+
+// One project's page: status, links, the update log, next step, milestones, details and notes.
+function projectHTML(){
+  const p = getProj(S.ui.tkItem); if (!p) { S.ui.view = "projects"; return projsHTML(); }
+  const l = getList(p.list), st = staleDays(p);
+  const ups = (p.updates || []).map(u => `<li class="pu"><span class="pu-d num" title="${esc(fmtDay(u.at))} ${esc(fmtTime(u.at))}">${esc(fmtFull(u.at))}</span><span class="pu-t">${u.status ? `Status changed to ${projPill(u.status)} ` : ""}${esc(u.text || "")}</span><button class="pu-x" data-act="pu-del" data-v="${u.id}" aria-label="Delete this update" title="Delete this update">×</button></li>`).join("");
+  const mss = (p.milestones || []).slice().sort((a, b) => (a.done - b.done) || (a.due || "9").localeCompare(b.due || "9"));
+  const msHTML = mss.map(m => { const t = dayAt(m.due), d = t ? daysTo(t) : null;
+    return `<li class="pm${m.done ? " done" : ""}"><label class="chk" for="pm-${m.id}"><input type="checkbox" id="pm-${m.id}" data-pm="${m.id}"${m.done ? " checked" : ""}> <span>${esc(m.title)}</span></label>${t ? `<span class="num pm-due ${!m.done && d < 0 ? "over" : !m.done && d <= 7 ? "warn" : ""}">${fmtDate(t)}</span>` : ""}<button class="pu-x" data-act="pm-del" data-v="${m.id}" aria-label="Delete milestone ${esc(m.title)}">×</button></li>`; }).join("");
+  const kv = [["Kind", labelOf(PROJ_KINDS, p.kind)], ["Version", p.version], ["Started", isDate(p.started) ? fmtFull(dayAt(p.started)) : ""], ["Target finish", isDate(p.targetDate) ? fmtFull(dayAt(p.targetDate)) : ""], ["People", p.people], ["List", l ? l.name : ""]].filter(x => x[1]);
+  return `<div class="wrap pj-page">
+    <div><button class="btn sm ghost pj-back" data-act="tk-projs" data-v="${l ? l.id : "all"}">${ICON.back}${l ? esc(l.name) : "All projects"}</button></div>
+    <div class="head-row"><div style="min-width:0"><div class="eyebrow">Project</div><h1 class="page-h">${esc(p.name || "Untitled project")}</h1>${p.summary ? `<p class="sub">${esc(p.summary)}</p>` : ""}</div>
+      <div class="row"><label class="flt" for="pjStatus"><span class="vh">Status</span><select class="in" id="pjStatus">${PROJ_STATUS.map(([k, lb]) => `<option value="${k}"${k === p.status ? " selected" : ""}>${lb}</option>`).join("")}</select></label><button class="btn" data-act="proj-edit" data-v="${p.id}">Edit project</button></div></div>
+    ${projLinks(p, "btn") || isStale(p) ? `<div class="row pj-links">${projLinks(p, "btn")}${isStale(p) ? `<span class="tk-stale">Active, but no update in ${st} days</span>` : ""}</div>` : ""}
+    <div class="grid2">
+      <section class="sec" aria-labelledby="pu-h"><div class="sec-h"><h2 id="pu-h">Updates</h2><span class="meta">${(p.updates || []).length ? `latest ${rel(p.updates[0].at).toLowerCase()}` : "nothing logged yet"}</span></div>
+        <div class="pu-add"><label class="vh" for="puText">What happened</label><input class="in" id="puText" autocomplete="off" placeholder="What happened? e.g. Released 1.2.0 on PyPI (Enter adds it)"><button class="btn" data-act="pu-add">Add update</button></div>
+        ${ups ? `<ul class="pu-list">${ups}</ul>` : `<div class="empty">Log what happened as you go, one line at a time. The newest line shows on the project's card, so you can see where everything stands at a glance.</div>`}
+      </section>
+      <div class="pj-side">
+        <section class="card" aria-labelledby="pn-h"><h3 id="pn-h">Next step</h3>
+          <div class="pn"><label class="vh" for="pnText">Next step</label><input class="in" id="pnText" autocomplete="off" placeholder="The one thing to do next" value="${esc(p.next?.text || "")}">
+          <label class="vh" for="pnDue">Due</label><input class="in" id="pnDue" type="date" value="${esc(p.next?.due || "")}"><button class="btn sm" data-act="pn-save">Save</button></div></section>
+        <section class="card" aria-labelledby="pm-h"><h3 id="pm-h">Milestones</h3>
+          ${msHTML ? `<ul class="pm-list">${msHTML}</ul>` : ""}
+          <div class="pn"><label class="vh" for="pmTitle">New milestone</label><input class="in" id="pmTitle" autocomplete="off" placeholder="New milestone"><label class="vh" for="pmDue">Due</label><input class="in" id="pmDue" type="date"><button class="btn sm" data-act="pm-add">Add</button></div></section>
+        ${kv.length || (p.tags || []).length ? `<section class="card"><h3>Details</h3>${kv.length ? `<dl class="kv">${kv.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}${(p.tags || []).length ? `<div class="row">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}</section>` : ""}
+      </div>
+    </div>
+    ${p.notes ? `<section class="sec" aria-labelledby="pnt-h"><div class="sec-h"><h2 id="pnt-h">Notes</h2></div><div class="md pj-notes">${mdPlain(p.notes)}</div></section>` : ""}
+  </div>`;
+}
+function projTouch(p){ p.updatedAt = Date.now(); tsave(); rerenderKeep(); }
+function projAddUpdate(){
+  const p = getProj(S.ui.tkItem), i = $("#puText"), text = (i?.value || "").trim(); if (!p) return;
+  if (!text){ i.focus(); return; }
+  (p.updates = p.updates || []).unshift({id:uid(), at:Date.now(), text, status:null});
+  projTouch(p); $("#puText")?.focus();
+}
+function projSetStatus(v){
+  const p = getProj(S.ui.tkItem); if (!p || p.status === v) return;
+  p.status = v; (p.updates = p.updates || []).unshift({id:uid(), at:Date.now(), text:"", status:v});
+  projTouch(p); $("#pjStatus")?.focus(); toast(`Status: ${labelOf(PROJ_STATUS, v)}`);
+}
+
+let PF = null; // the open project form: {id, kind, tags, init}
+function showProjForm(id, listId){
+  const p = id ? getProj(id) : null; if (id && !p) return;
+  const lists = tkLists("projects");
+  PF = {id:p ? p.id : uid(), kind:p?.kind || "research", tags:[...(p?.tags || [])]};
+  const inList = p ? p.list : listId && getList(listId) ? listId : S.ui.view === "projects" && getList(S.ui.tkList) ? S.ui.tkList : lists[0]?.id || "";
+  const val = s => `value="${esc(s ?? "")}"`;
+  const m = $("#modal");
+  m.innerHTML = `<div class="mdl wide" role="dialog" aria-modal="true" aria-labelledby="mdl-h" id="pfForm">
+    <h2 id="mdl-h">${p ? "Edit project" : "Add a project"}</h2>
+    <label class="lbl" for="pfName">Name<input class="in" id="pfName" autocomplete="off" ${val(p?.name)}></label>
+    <label class="lbl" for="pfSum">One-line summary<input class="in" id="pfSum" autocomplete="off" placeholder="What it is, in one line. Shown on the card." ${val(p?.summary)}></label>
+    <div class="lbl">Kind<div class="seg" role="group" aria-label="Kind">${PROJ_KINDS.map(([k, lb]) => `<button type="button" data-act="pf-kind" data-v="${k}" class="${k === PF.kind ? "on" : ""}" aria-pressed="${k === PF.kind}">${lb}</button>`).join("")}</div></div>
+    <div class="two"><label class="lbl" for="pfStatus">Status<select class="in" id="pfStatus">${PROJ_STATUS.map(([k, lb]) => `<option value="${k}"${k === (p?.status || "active") ? " selected" : ""}>${lb}</option>`).join("")}</select></label>
+      <label class="lbl" for="pfVer">Version, optional<input class="in num" id="pfVer" autocomplete="off" placeholder="e.g. 1.2.0" ${val(p?.version)}></label></div>
+    <label class="lbl" for="pfGit">GitHub repository<input class="in" id="pfGit" type="url" autocomplete="off" spellcheck="false" placeholder="https://github.com/owner/name" ${val(p?.github)}></label>
+    <div class="lbl">Other links<div class="pf-links" id="pfLinks">${(p?.links || []).map(linkRowHTML).join("")}</div><button type="button" class="nav-add pf-addlink" data-act="pl-add">+ Add a link (docs, demo, PyPI, Overleaf, dataset…)</button></div>
+    <div class="two"><label class="lbl" for="pfStart">Started<input class="in" id="pfStart" type="date" ${val(p ? p.started : isoDay(Date.now()))}></label>
+      <label class="lbl" for="pfTarget">Target finish, optional<input class="in" id="pfTarget" type="date" ${val(p?.targetDate)}></label></div>
+    <div class="lbl">Tags${tagEditor(PF.tags, "proj")}</div>
+    <label class="lbl" for="pfPeople">People, optional<input class="in" id="pfPeople" autocomplete="off" placeholder="Collaborators, supervisor" ${val(p?.people)}></label>
+    <label class="lbl" for="pfList">List<select class="in" id="pfList">${lists.length ? lists.map(l => `<option value="${l.id}"${l.id === inList ? " selected" : ""}>${esc(l.name)}</option>`).join("") : `<option value="">My projects (a new list)</option>`}</select></label>
+    <label class="lbl" for="pfNotes">Notes<textarea class="in" id="pfNotes" rows="4" placeholder="Goals, decisions, anything to remember. Markdown works.">${esc(p?.notes || "")}</textarea></label>
+    <p class="hint" id="pfMsg" role="status"></p>
+    <div class="mdl-foot" id="pfFoot">${pfFoot(!!p)}</div>
+  </div>`;
+  m.hidden = false; PF.init = projSnap(); $("#pfName").focus();
+}
+const linkRowHTML = l => `<div class="pf-link"><label class="vh">Label</label><input class="in" data-pl="label" autocomplete="off" placeholder="Label, e.g. PyPI" value="${esc(l?.label || "")}"><label class="vh">Link</label><input class="in" data-pl="url" type="url" autocomplete="off" spellcheck="false" placeholder="https://…" value="${esc(l?.url || "")}"><button type="button" class="pu-x" data-act="pl-del" aria-label="Remove this link">×</button></div>`;
+const pfFoot = editing => `${editing ? `<button class="btn ghost danger tk-del" data-act="proj-del">Delete</button>` : ""}<button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="proj-save">${editing ? "Save" : "Add project"}</button>`;
+const projSnap = () => JSON.stringify([PF.kind, PF.tags, [...document.querySelectorAll("#pfForm input.in:not(.tag-in), #pfForm select, #pfForm textarea")].map(i => i.value)]);
+const projDirty = () => !!(PF && $("#pfForm") && projSnap() !== PF.init);
+function projSave(){
+  const v = id => ($("#" + id)?.value || "").trim(), msg = $("#pfMsg"), name = v("pfName"), git = v("pfGit");
+  if (!name){ msg.textContent = "Give the project a name."; $("#pfName").focus(); return; }
+  if (git && !SAFE_LINK.test(git)){ msg.textContent = "The repository link should start with https://"; $("#pfGit").focus(); return; }
+  const links = [...document.querySelectorAll("#pfLinks .pf-link")].map(r => ({label:r.querySelector('[data-pl="label"]').value.trim(), url:r.querySelector('[data-pl="url"]').value.trim()})).filter(l => l.url || l.label);
+  const bad = links.find(l => !SAFE_LINK.test(l.url));
+  if (bad){ msg.textContent = `The link${bad.label ? ` “${bad.label}”` : ""} should start with https://`; return; }
+  const tagIn = $("#tagIn-proj"); if (tagIn && normTag(tagIn.value)) addTag("proj", tagIn.value);
+  const old = getProj(PF.id), was = old ? old.list : null, st = v("pfStatus");
+  let l = getList(v("pfList")); if (!l) l = newList("projects", "My projects");
+  const p = Object.assign(old || {id:PF.id, addedAt:Date.now(), updates:[], milestones:[], next:null, papers:[], myPapers:[], image:null}, {
+    list:l.id, name, summary:v("pfSum"), kind:PF.kind, version:v("pfVer"), github:git, links,
+    started:v("pfStart"), targetDate:v("pfTarget"), tags:PF.tags.slice(), people:v("pfPeople"), notes:$("#pfNotes").value.trim(), updatedAt:Date.now()});
+  if (old && old.status !== st) (p.updates = p.updates || []).unshift({id:uid(), at:Date.now(), text:"", status:st});
+  p.status = st;
+  if (was && was !== l.id){ const pl = getList(was); if (pl) pl.order = (pl.order || []).filter(i => i !== p.id); }
+  if (!(l.order || (l.order = [])).includes(p.id)) l.order.push(p.id);
+  if (!old) TK.projects.push(p);
+  tsave(); PF = null; closeModal(); closeReader();
+  S.ui.view = "project"; S.ui.tkItem = p.id; save(); renderAll();
+  toast(old ? `Saved “${p.name}”` : `Added “${p.name}” to ${l.name}`);
+}
+function projDelete(){
+  const p = getProj(PF && PF.id); if (!p) return closeModal();
+  TK.projects = TK.projects.filter(y => y.id !== p.id);
+  const l = getList(p.list); if (l) l.order = (l.order || []).filter(i => i !== p.id);
+  tsave(); PF = null; closeModal(); S.ui.view = "projects"; S.ui.tkList = l ? l.id : "all"; save(); renderAll(); toast(`Deleted “${p.name}”`);
+}
+
 /* ---------------- tag picker ---------------- */
 // The tag box suggests tags already in the library: most used first when empty, matches (prefix first) as you type.
 // Enter or comma adds the selected suggestion, or the typed text as a new tag; Backspace in an empty box removes the last tag.
@@ -1999,9 +2188,10 @@ function tagCounts(kind){ // a submission's topics are suggested from other subm
   const c = {}, add = t => c[t] = (c[t] || 0) + 1;
   S.papers.forEach(p => p.tags.forEach(add));
   if (kind === "sub") TK.submissions.forEach(x => (x.topics || []).forEach(add));
+  if (kind === "proj") TK.projects.forEach(x => (x.tags || []).forEach(add));
   return c;
 }
-function tagList(kind){ return kind === "draft" ? (LINK ? LINK.tags : null) : kind === "paper" && R ? getP(R.id).tags : kind === "sub" ? (SUBF ? SUBF.topics : null) : null; }
+function tagList(kind){ return kind === "draft" ? (LINK ? LINK.tags : null) : kind === "paper" && R ? getP(R.id).tags : kind === "sub" ? (SUBF ? SUBF.topics : null) : kind === "proj" ? (PF ? PF.tags : null) : null; }
 function tagEditor(tags, kind){
   return `<div class="tags-ed" data-tags-of="${kind}">${tags.map(t => `<span class="tag">${esc(t)}<button type="button" data-act="tag-del" data-k="${kind}" data-v="${esc(t)}" aria-label="Remove tag ${esc(t)}">×</button></span>`).join("")}
     <span class="tag-pick"><input class="in tag-in" id="tagIn-${kind}" data-tags="${kind}" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="tagSug-${kind}" autocomplete="off" spellcheck="false" placeholder="${tags.length ? "add tag" : "add a tag"}" aria-label="Add a tag"><div class="tag-sug" id="tagSug-${kind}" role="listbox" aria-label="Tags in your library" hidden></div></span></div>`;
@@ -2138,6 +2328,23 @@ document.addEventListener("click", async e => {
     case "sub-del-no": $("#sfFoot").innerHTML = sfFoot(true); break;
     case "sub-del-yes": subDelete(); break;
     case "sub-mark": subMark(v); break;
+    case "tk-projs": closeReader(); S.ui.view = "projects"; S.ui.tkList = v; save(); renderAll(); break;
+    case "proj-new": showProjForm(null, v); break;
+    case "proj-open": closeReader(); S.ui.view = "project"; S.ui.tkItem = v; save(); renderAll(); break;
+    case "proj-edit": showProjForm(v); break;
+    case "proj-save": projSave(); break;
+    case "proj-del": $("#pfFoot").innerHTML = `<span class="tk-confirm">Delete this project and its update log? This can't be undone.</span><button class="btn ghost" data-act="proj-del-no">Keep it</button><button class="btn primary" data-act="proj-del-yes">Delete</button>`; $("#pfFoot .btn.primary").focus(); break;
+    case "proj-del-no": $("#pfFoot").innerHTML = pfFoot(true); break;
+    case "proj-del-yes": projDelete(); break;
+    case "pf-kind": PF.kind = v; document.querySelectorAll('[data-act="pf-kind"]').forEach(b => { b.classList.toggle("on", b.dataset.v === v); b.setAttribute("aria-pressed", String(b.dataset.v === v)); }); break;
+    case "pl-add": $("#pfLinks").insertAdjacentHTML("beforeend", linkRowHTML(null)); $("#pfLinks .pf-link:last-child input").focus(); break;
+    case "pl-del": t.closest(".pf-link").remove(); break;
+    case "pu-add": projAddUpdate(); break;
+    case "pu-del": { const pp = getProj(S.ui.tkItem); if (pp){ pp.updates = (pp.updates || []).filter(u => u.id !== v); projTouch(pp); toast("Update deleted"); } break; }
+    case "pn-save": { const pp = getProj(S.ui.tkItem); if (pp){ const tx = $("#pnText").value.trim(), du = $("#pnDue").value; pp.next = tx ? {text:tx, due:du} : null; projTouch(pp); toast(tx ? "Next step saved" : "Next step cleared"); } break; }
+    case "pm-add": { const pp = getProj(S.ui.tkItem), tx = $("#pmTitle").value.trim(); if (!pp) break; if (!tx){ $("#pmTitle").focus(); break; } (pp.milestones = pp.milestones || []).push({id:uid(), title:tx, due:$("#pmDue").value, done:false}); projTouch(pp); $("#pmTitle")?.focus(); break; }
+    case "pm-del": { const pp = getProj(S.ui.tkItem); if (pp){ pp.milestones = (pp.milestones || []).filter(m => m.id !== v); projTouch(pp); } break; }
+    case "tpf-clear": S.ui.tpF = {...TPF0}; save(); rerenderKeep(); break;
     case "tk-up": tkStep(v, -1, '[data-act="tk-up"]'); break;
     case "tk-down": tkStep(v, 1, '[data-act="tk-down"]'); break;
     case "tkf-clear": S.ui.tkF = {...TKF0}; save(); rerenderKeep(); break;
@@ -2157,6 +2364,9 @@ document.addEventListener("input", e => {
   if (t.id === "lkUrl"){ linkUrlChanged(); return; }
   if (t.id === "lkBib"){ linkBibChanged(); return; }
   if (t.id === "sfStatus" || t.id === "sfFree"){ sfChanged(t); return; }
+  if (t.id === "pjStatus"){ projSetStatus(t.value); return; }
+  if (t.dataset && t.dataset.pm){ const pp = getProj(S.ui.tkItem), m = pp && (pp.milestones || []).find(x => x.id === t.dataset.pm); if (m){ m.done = t.checked; projTouch(pp); $("#pm-" + m.id)?.focus(); if (m.done) toast(`Milestone done: ${m.title}`); } return; }
+  if (t.dataset && t.dataset.tpf){ S.ui.tpF = {...tpF(), [t.dataset.tpf]:t.value}; save(); rerenderKeep(); document.getElementById(t.id)?.focus(); return; }
   if (t.dataset && t.dataset.tkf){ S.ui.tkF = {...tkF(), [t.dataset.tkf]:t.type === "checkbox" ? t.checked : t.value}; save(); rerenderKeep(); document.getElementById(t.id)?.focus(); return; }
   if (t.classList.contains("tag-in")){ if (t.value.includes(",")){ addTag(t.dataset.tags, t.value); } else tagSuggest(t); return; } // comma pasted or typed on mobile keyboards
   if (!R) return; const p = getP(R.id);
@@ -2167,8 +2377,9 @@ document.addEventListener("input", e => {
 document.addEventListener("keydown", e => {
   const t = e.target;
   if (t.classList && t.classList.contains("tag-in") && tagKey(e, t)) return;
-  if (e.key === "Escape" && !$("#modal").hidden){ if (formDirty()){ ($("#lkMsg") || $("#sfMsg")).textContent = "Press Cancel to discard what you've typed."; return; } closeModal(); return; }
+  if (e.key === "Escape" && !$("#modal").hidden){ if (formDirty()){ ($("#lkMsg") || $("#sfMsg") || $("#pfMsg")).textContent = "Press Cancel to discard what you've typed."; return; } closeModal(); return; }
   if (t.id === "lfName" && e.key === "Enter"){ e.preventDefault(); listSave(); return; }
+  if (e.key === "Enter" && (t.id === "puText" || t.id === "pmTitle" || t.id === "pmDue" || t.id === "pnText" || t.id === "pnDue")){ e.preventDefault(); document.querySelector(`[data-act="${t.id === "puText" ? "pu-add" : t.id.startsWith("pm") ? "pm-add" : "pn-save"}"]`)?.click(); return; }
   if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && t.closest && t.closest(".tk-list.ordered .tk-row")){ e.preventDefault(); tkStep(t.closest(".tk-row").dataset.id, e.key === "ArrowUp" ? -1 : 1, ".tk-t"); return; }
   if (t.id === "idIn" && e.key === "Enter"){ e.preventDefault(); addById(); return; }
   if (e.altKey && e.key === "ArrowLeft" && R && R.hist.length){ e.preventDefault(); goBack(); return; }  // instead of leaving the page
@@ -2195,7 +2406,7 @@ let rzT; window.addEventListener("resize", () => { clearTimeout(rzT); rzT = setT
 
 $("#fileIn").addEventListener("change", e => { importFiles(e.target.files); e.target.value = ""; });
 $("#impIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) startImport(f); });
-const formDirty = () => linkDirty() || subDirty();
+const formDirty = () => linkDirty() || subDirty() || projDirty();
 $("#modal").addEventListener("click", e => { if (e.target.id === "modal" && !formDirty()) closeModal(); });
 $("#attachIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) attachFile(f); });
 // Drag a row by its priority number to reorder the list.

@@ -157,6 +157,72 @@ try {
   await A.click(`document.querySelector('[data-act="list-del-yes"]')`); await wait(900);
   const d3 = await disk();
   check(d3.lists.length === 1 && d3.submissions.length === 1 && d3.submissions[0].title === "Chapter call from window B", "the list and its entries are gone from disk; the rest stays");
+  // ---------- projects ----------
+  await A.click(btn("tk-projs", "all"));
+  check(await A.js(`/All projects/.test(document.querySelector('.page-h').textContent) && /dated log of what happened/.test(document.querySelector('.empty').textContent)`), "All projects opens, with an explanation when empty");
+  await A.click(btn("proj-new"));
+  await A.click(btn("proj-save"));
+  check(/Give the project a name/.test(await A.js(`document.querySelector('#pfMsg').textContent`)), "a project needs a name");
+  await A.fill("pfName", "StudyDesk"); await A.fill("pfSum", "Local-first reading desk for papers"); await A.click(btn("pf-kind", "software"));
+  await A.fill("pfGit", "github.com/someone/studydesk"); await A.click(btn("proj-save"));
+  check(/should start with https/.test(await A.js(`document.querySelector('#pfMsg').textContent`)), "a repository link without https:// is refused with a reason");
+  await A.fill("pfGit", "https://github.com/someone/studydesk.git"); await A.fill("pfVer", "1.2.0");
+  await A.click(btn("pl-add")); await A.js(`(() => { const r = document.querySelector('#pfLinks .pf-link'); r.querySelector('[data-pl=label]').value = "PyPI"; r.querySelector('[data-pl=url]').value = "https://pypi.org/project/studydesk/"; })()`);
+  await A.fill("pfNotes", "Ship the trackers. See p. 3 of the plan.");
+  await A.click(btn("proj-save")); await wait(400);
+  check(await A.js(`/StudyDesk/.test(document.querySelector('.page-h').textContent) && /My projects/.test(document.querySelector('.pj-nav').textContent)`), "saving opens the project's page; the first project makes a list called My projects");
+  const links = await A.js(`[...document.querySelectorAll('.pj-links a')].map(a => a.textContent.trim())`);
+  check(links[0] === "someone/studydesk ↗" && links[1] === "PyPI ↗", `GitHub shows as owner/name, other links by their label (${links})`);
+  check(await A.js(`!document.querySelector('.pj-notes [data-act="goto"]') && /p\. 3/.test(document.querySelector('.pj-notes').textContent)`), "notes are rendered, and p. N stays plain text (there are no pages here)");
+  await A.js(`document.querySelector('#puText').focus()`); await A.fill("puText", "Built the submissions tracker"); await A.key("Enter");
+  await A.fill("puText", "Released 1.2.0 on PyPI"); await A.click(btn("pu-add"));
+  check(JSON.stringify(await A.js(`[...document.querySelectorAll('.pu-t')].map(e => e.textContent.trim())`)) === '["Released 1.2.0 on PyPI","Built the submissions tracker"]' && await A.js(`document.activeElement.id`) === "puText", "updates are added with Enter or the button, newest first, ready for the next one");
+  await A.fill("pjStatus", "paused"); await wait(300);
+  check(/Status changed to\s*Paused/.test(await A.js(`document.querySelector('.pu-t').textContent`)), "changing the status logs it");
+  await A.fill("pjStatus", "active"); await wait(300);
+  await A.fill("pnText", "Write the My papers step"); await A.fill("pnDue", iso(2)); await A.click(btn("pn-save"));
+  await A.fill("pmTitle", "Trackers in a release"); await A.fill("pmDue", iso(3)); await A.click(btn("pm-add"));
+  await A.fill("pmTitle", "Desktop app"); await A.click(btn("pm-add"));
+  check(await A.js(`document.querySelectorAll('.pm').length`) === 2 && /Trackers in a release/.test(await A.js(`document.querySelector('.pm').textContent`)), "milestones are added, dated ones first");
+  await A.shot("tk-project");
+  await A.click(btn("tk-projs", "all"));
+  const card = await A.js(`document.querySelector('.tk-row').innerText`);
+  check(/Status changed to Active/.test(card) && /Today/.test(card) && /Next: Write the My papers step/.test(card) && /Milestone: Trackers in a release/.test(card) && /v1\.2\.0/.test(card) && /someone\/studydesk/.test(card), "the card shows the latest update and when, the next step, the next milestone, version and repo");
+  check(await A.js(`!!document.querySelector('.tk-row .tk-m .warn')`), "a milestone due within a week is flagged on the card");
+  await A.click(btn("proj-open", await A.js(`document.querySelector('.tk-row').dataset.id`)));
+  await A.js(`document.querySelector('.pm input[type=checkbox]').click()`); await wait(300);
+  check(await A.js(`!!document.querySelector('.pm.done') && /Trackers in a release/.test(document.querySelector('.pm.done').textContent)`), "ticking a milestone marks it done");
+
+  // a project nobody has touched for 20 days, written by another window
+  const cur = await (await fetch(app + "api/tracker")).json(), ml = cur.tracker.lists.find(l => l.section === "projects");
+  cur.tracker.projects.push({ id: "oldproj01", list: ml.id, name: "Thesis chapter 3", kind: "research", status: "active", addedAt: Date.now() - 40 * 864e5, updatedAt: Date.now() - 20 * 864e5,
+    updates: [{ id: "u-old", at: Date.now() - 20 * 864e5, text: "Drafted the related work", status: null }], milestones: [], links: [], tags: [] });
+  ml.order.push("oldproj01");
+  check((await fetch(app + "api/tracker", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baseRev: cur.rev, tracker: cur.tracker }) })).ok, "(another window saves a project last updated 20 days ago)");
+  await A.js(`window.dispatchEvent(new Event("focus"))`); await wait(900);
+  await A.click(btn("tk-projs", ml.id));
+  check(/No update in 20 days/.test(await A.js(`${byText(".tk-row", "/Thesis chapter 3/")}.innerText`)) && await A.js(`!!document.querySelector('.pj-nav .tk-dot')`), "an active project with no update for 20 days is marked, and its list gets a dot");
+  await A.fill("tpSt", "stale"); await wait(200);
+  check(JSON.stringify(await A.js(`[...document.querySelectorAll('.tk-t')].map(b => b.textContent)`)) === '["Thesis chapter 3"]', "the No update in 14+ days filter finds it");
+  await A.click(btn("tpf-clear"));
+  await A.click(`${byText(".tk-row", "/Thesis chapter 3/")}.querySelector('[data-act="tk-up"]')`);
+  check(JSON.stringify(await A.js(`[...document.querySelectorAll('.tk-t')].map(b => b.textContent)`)) === '["Thesis chapter 3","StudyDesk"]', "projects reorder like submissions");
+
+  // both windows log an update on the same project at once
+  const pid = await A.js(`${byText(".tk-row", "/StudyDesk/")}.dataset.id`);
+  await wait(800);
+  await B.js(`window.dispatchEvent(new Event("focus"))`); await wait(900);
+  await B.click(btn("tk-projs", "all")); await B.click(btn("proj-open", pid));
+  await A.click(btn("proj-open", pid));
+  await B.fill("puText", "Update from window B"); await B.click(btn("pu-add")); await wait(700);
+  await A.fill("puText", "Update from window A"); await A.click(btn("pu-add")); await wait(1200);
+  const pj = (await disk()).projects.find(x => x.id === pid);
+  check(["Update from window A", "Update from window B", "Released 1.2.0 on PyPI"].every(t => pj.updates.some(u => u.text === t)), "two windows adding updates to the same project: both are kept, nothing lost");
+
+  // delete
+  await A.click(btn("proj-edit", pid)); await A.click(btn("proj-del")); await A.click(btn("proj-del-yes")); await wait(800);
+  check(!(await disk()).projects.some(x => x.id === pid) && /Projects/.test(await A.js(`document.querySelector('.eyebrow').textContent`)), "deleting a project removes it and returns to its list");
+
   await A.cdp("Page.reload"); await wait(2000);
   check(await A.js(`document.querySelector('.tk-nav').innerText.includes("Where to submit")`), "after a reload the sidebar still lists it");
   check(!A.errs.length && !B.errs.length, `no script errors (${[...A.errs, ...B.errs].join(" | ")})`);
