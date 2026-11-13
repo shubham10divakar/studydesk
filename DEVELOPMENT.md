@@ -62,6 +62,8 @@ chrome --headless=new --remote-debugging-port=9337 --user-data-dir=<temp dir> ab
 node scripts/e2e/disk-storage.mjs 9337 <abs path>/sample-paper.pdf <abs empty work dir>   # from the repo root
 ```
 
+`node scripts/tracker-merge.mjs` checks the tracker's two-window merge rules (`mergeTracker3`, docs/trackers.md § Data) on the functions taken straight from `app.js`; no browser needed (7 checks).
+
 More end-to-end scripts (each prints PASS/FAIL lines; all except add-by-id and link-papers run against the static server, `npm run dev:static -- 5193`):
 
 | Script | Checks | Arguments |

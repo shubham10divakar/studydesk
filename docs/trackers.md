@@ -1,6 +1,6 @@
 # Trackers: submissions, projects, my papers (plan)
 
-Status: **agreed 2026-11-13, not built yet**. Kept simple on purpose: see Decisions at the end.
+Status: **being built, step by step** (progress under Build order). Agreed 2026-11-13; kept simple on purpose, see Decisions at the end.
 
 StudyDesk today records what you read. The trackers record what you *make* and where it goes:
 
@@ -127,8 +127,9 @@ The format id is new, so it can use the StudyDesk name; D-013 only fixes the exi
 ```
 
 - **Server**: `GET/PUT /api/tracker` with the same rev check, atomic write, daily backup and Host/Origin rules as `/api/library`; `GET/PUT/DELETE /api/image/<id>` like PDFs (same id pattern, content type checked, size cap).
-- **Two windows**: a 409 merges like papers do: by id, the newer `updatedAt` wins per entry, update logs and milestones are unioned by id, and list order is taken from the side that changed it.
+- **Two windows**: a 409 merges three ways like papers do (`mergeTracker3` in `app.js`): by id, a change made on only one side wins, and removals are honoured unless the other side changed that entry. An entry changed in both windows takes this window's version, except that a project's update log and milestones are unioned by id, and a list's order keeps entries the other window added.
 - **Browser-storage mode**: a new localStorage key `studydesk.tracker.v1`; images in the existing IndexedDB under prefixed ids.
+- **Code**: `Store.read_tracker` / `write_tracker` in `studydesk/store.py`; the `tracker storage` section of `app.js` (`TK` is the tracker, `tsave()` / `tsaveSoon()` its save, `TDISK` the disk state). `GET /api/info` also returns `trackerRev`, so coming back to a window picks up tracker changes made elsewhere.
 - **Export / import**: the zip adds `tracker.json`, `images/` and `tracker.md` (readable). Import merges with the rules above. Older StudyDesk versions ignore the extra files.
 - `data-model.md` gets these tables before Phase 2, so the SQLite schema includes them.
 
@@ -136,15 +137,17 @@ The format id is new, so it can use the StudyDesk name; D-013 only fixes the exi
 
 One commit per step, pushed, shown working (e2e + screenshot). Docs in one commit at the end.
 
-1. `tracker.json` store, `/api/tracker`, merge, browser-storage fallback, unit tests
-2. Lists and submissions: add, edit, delete, mark as submitted
-3. Reorder by drag, filters
-4. Projects: page, update log, next step, milestones, links, stale marker
-5. My papers, and linking them to submissions and projects
-6. Upcoming view and the two Overview cards
-7. Images
-8. Export / import of the tracker
-9. Docs: README, About `FEATURES`, CHANGELOG (Unreleased), roadmap, architecture, data-model
+Each step leaves the app working, so building can stop after any of them.
+
+- [x] 1. `tracker.json` store, `/api/tracker`, merge, browser-storage fallback, unit tests (no UI yet)
+- [ ] 2. Lists and submissions: add, edit, delete, mark as submitted
+- [ ] 3. Reorder by drag, filters
+- [ ] 4. Projects: page, update log, next step, milestones, links, stale marker
+- [ ] 5. My papers, and linking them to submissions and projects
+- [ ] 6. Upcoming view and the two Overview cards
+- [ ] 7. Images
+- [ ] 8. Export / import of the tracker
+- [ ] 9. Docs: README, About `FEATURES`, CHANGELOG, roadmap, architecture, data-model (each step also updates the docs it touches)
 
 Later, if wanted: search across trackers.
 

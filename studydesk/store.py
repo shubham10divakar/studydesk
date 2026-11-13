@@ -1,7 +1,9 @@
-"""The library folder: library.json, pdfs/<id>.pdf and daily backups. Standard library only.
+"""The library folder: library.json, tracker.json, pdfs/<id>.pdf and daily backups. Standard library only.
 
 Spec: docs/disk-storage.md. Writes are atomic (temp file + os.replace), and the revision token is the
 file's mtime and size, so several studydesk processes on different ports can share one folder.
+tracker.json (submissions, projects, my papers: docs/trackers.md) is a separate file with its own rev, so
+studydesk 1.2.0, which rewrites library.json with papers only, can't drop it.
 """
 
 from __future__ import annotations
@@ -19,6 +21,9 @@ from typing import BinaryIO
 
 FORMAT = "pdfdesk-library"
 FORMAT_VERSION = 1
+TRACKER_FORMAT = "studydesk-tracker"
+TRACKER_FORMAT_VERSION = 1
+TRACKER_KEYS = ("lists", "submissions", "projects", "myPapers")
 KEEP_BACKUPS = 14
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 CHUNK = 1 << 20
@@ -27,10 +32,10 @@ CHUNK = 1 << 20
 class Conflict(Exception):
     """The library changed since the client last read it."""
 
-    def __init__(self, rev: str, papers: list | None):
+    def __init__(self, rev: str, papers: list | dict | None):
         super().__init__("library changed")
         self.rev = rev
-        self.papers = papers
+        self.papers = papers  # the tracker dict for tracker.json
 
 
 def default_dir() -> Path:
@@ -78,6 +83,7 @@ class Store:
     def __init__(self, root: Path):
         self.root = Path(root).expanduser().resolve()
         self.lib = self.root / "library.json"
+        self.tracker = self.root / "tracker.json"
         self.pdfs = self.root / "pdfs"
         self.backups = self.root / "backups"
         self.lock = threading.Lock()
@@ -86,8 +92,12 @@ class Store:
 
     # ---------- library.json ----------
     def rev(self) -> str:
+        return self._rev(self.lib)
+
+    @staticmethod
+    def _rev(path: Path) -> str:
         try:
-            st = self.lib.stat()
+            st = path.stat()
         except FileNotFoundError:
             return "0"
         return f"{st.st_mtime_ns}-{st.st_size}"
@@ -113,7 +123,7 @@ class Store:
             if base_rev != self.rev():
                 rev, current = self._read()
                 raise Conflict(rev, current)
-            self._backup()
+            self._backup(self.lib, "library")
             doc = {
                 "format": FORMAT,
                 "formatVersion": FORMAT_VERSION,
@@ -123,18 +133,54 @@ class Store:
             _atomic_write(self.lib, [json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8")])
             return self.rev()
 
-    def _backup(self) -> None:
-        if not self.lib.exists():
+    def _backup(self, src: Path, prefix: str) -> None:
+        if not src.exists():
             return
-        today = self.backups / f"library-{datetime.date.today().isoformat()}.json"
+        today = self.backups / f"{prefix}-{datetime.date.today().isoformat()}.json"
         if not today.exists():
-            shutil.copy2(self.lib, today)
-            old = sorted(self.backups.glob("library-*.json"))[:-KEEP_BACKUPS]
+            shutil.copy2(src, today)
+            old = sorted(self.backups.glob(f"{prefix}-*.json"))[:-KEEP_BACKUPS]
             for p in old:
                 try:
                     p.unlink()
                 except OSError:
                     pass
+
+    # ---------- tracker.json ----------
+    def tracker_rev(self) -> str:
+        return self._rev(self.tracker)
+
+    def read_tracker(self) -> tuple[str, dict | None]:
+        with self.lock:
+            return self._read_tracker()
+
+    def _read_tracker(self) -> tuple[str, dict | None]:
+        try:
+            with open(self.tracker, "rb") as f:
+                st = os.fstat(f.fileno())
+                data = json.loads(f.read().decode("utf-8"))
+        except FileNotFoundError:
+            return "0", None
+        if not isinstance(data, dict):
+            return f"{st.st_mtime_ns}-{st.st_size}", None
+        return f"{st.st_mtime_ns}-{st.st_size}", {k: data[k] if isinstance(data.get(k), list) else [] for k in TRACKER_KEYS}
+
+    def write_tracker(self, base_rev: str, tracker: dict) -> str:
+        if not isinstance(tracker, dict) or not all(isinstance(tracker.get(k, []), list) for k in TRACKER_KEYS):
+            raise ValueError("tracker must be an object of lists")
+        with self.lock:
+            if base_rev != self.tracker_rev():
+                rev, current = self._read_tracker()
+                raise Conflict(rev, current)
+            self._backup(self.tracker, "tracker")
+            doc = {
+                "format": TRACKER_FORMAT,
+                "formatVersion": TRACKER_FORMAT_VERSION,
+                "savedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+                **{k: tracker.get(k, []) for k in TRACKER_KEYS},
+            }
+            _atomic_write(self.tracker, [json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8")])
+            return self.tracker_rev()
 
     # ---------- PDFs ----------
     def pdf_path(self, pid: str) -> Path:

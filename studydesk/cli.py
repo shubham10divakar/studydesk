@@ -129,10 +129,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return super().do_GET()
         store: Store = self.server.store  # type: ignore[attr-defined]
         if parts == ["info"]:
-            return self._json(200, {"app": "studydesk", "version": __version__, "dataDir": str(store.root), "rev": store.rev(), "platform": sys.platform})
+            return self._json(200, {"app": "studydesk", "version": __version__, "dataDir": str(store.root), "rev": store.rev(), "trackerRev": store.tracker_rev(), "platform": sys.platform})
         if parts == ["library"]:
             rev, papers = store.read()
             return self._json(200, {"rev": rev, "papers": papers})
+        if parts == ["tracker"]:
+            rev, tracker = store.read_tracker()
+            return self._json(200, {"rev": rev, "tracker": tracker})
         if len(parts) == 2 and parts[0] == "pdf":
             try:
                 data = store.read_pdf(parts[1])
@@ -171,6 +174,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self._json(409, {"rev": c.rev, "papers": c.papers})
             except (ValueError, KeyError, TypeError, UnicodeDecodeError):
                 return self._json(400, {"error": "expected {baseRev, papers}"})
+            return self._json(200, {"rev": rev})
+        if parts == ["tracker"]:
+            n = self._length(MAX_LIBRARY)
+            if n is None:
+                return
+            try:
+                body = json.loads(self.rfile.read(n).decode("utf-8"))
+                rev = store.write_tracker(str(body["baseRev"]), body["tracker"])
+            except Conflict as c:
+                return self._json(409, {"rev": c.rev, "tracker": c.papers})
+            except (ValueError, KeyError, TypeError, UnicodeDecodeError):
+                return self._json(400, {"error": "expected {baseRev, tracker}"})
             return self._json(200, {"rev": rev})
         if parts and len(parts) == 2 and parts[0] == "pdf":
             n = self._length(MAX_PDF)

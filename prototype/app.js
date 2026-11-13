@@ -80,16 +80,19 @@ async function pushDisk(){
   if (DISK.again){ DISK.again = false; pushDisk(); }
 }
 function flushDisk(){ // page is closing: best effort, keepalive only allows small bodies
+  flushTracker();
   if (!diskDirty()) return;
   const body = `{"baseRev":${JSON.stringify(DISK.rev)},"papers":${JSON.stringify(S.papers)}}`;
   try { fetch("api/library", {method:"PUT", headers:{"Content-Type":"application/json"}, body, keepalive:body.length < 60000}); } catch(e){}
 }
 async function syncFromDisk(){ // coming back to this window: pick up changes made elsewhere
   if (!DISK.on || DISK.busy) return;
+  if (trackerDirty()) pushTracker();
   if (diskDirty()) return pushDisk();
   try {
     const info = await (await fetch("api/info", {cache:"no-store"})).json();
     netDown(false);
+    await syncTracker(info);
     if (info.rev === DISK.rev) return;
     const L = await (await fetch("api/library", {cache:"no-store"})).json();
     if (diskDirty()) return pushDisk();
@@ -165,6 +168,91 @@ const diskFiles = {
   del: k => { memFiles.delete(k); return fetch(`api/pdf/${encodeURIComponent(k)}`, {method:"DELETE"}).catch(()=>{}); }
 };
 let idb = bidb; // switched to diskFiles in boot() when running under studydesk
+
+/* ---------------- tracker storage ---------------- */
+// Submissions, projects and my papers (spec: docs/trackers.md) are one document apart from the papers:
+// tracker.json in the library folder under studydesk, with its own rev (studydesk 1.2.0 rewrites library.json with
+// papers only, so it can't drop the tracker), or localStorage under TKEY on a static server. tsave() is its save().
+const TKEY = "studydesk.tracker.v1", TK_PARTS = ["lists", "submissions", "projects", "myPapers"];
+const emptyTracker = () => ({lists:[], submissions:[], projects:[], myPapers:[]});
+let TK = emptyTracker();
+const TDISK = {rev:"0", base:emptyTracker(), sent:"", timer:0, busy:false, again:false};
+function tsave(){
+  if (!DISK.on){ try { localStorage.setItem(TKEY, JSON.stringify(TK)); } catch(e){} return; }
+  clearTimeout(TDISK.timer); TDISK.timer = setTimeout(pushTracker, 300);
+}
+let tsaveT; function tsaveSoon(){ clearTimeout(tsaveT); tsaveT = setTimeout(tsave, 500); }
+const trackerDirty = () => DISK.on && JSON.stringify(TK) !== TDISK.sent;
+const setTSent = t => { TDISK.sent = JSON.stringify(t); TDISK.base = JSON.parse(TDISK.sent); };
+// Every collection is an array of objects with a string id; anything else in a hand-edited file is dropped.
+function cleanTracker(t){
+  const out = emptyTracker(); if (!t || typeof t !== "object") return out;
+  for (const k of TK_PARTS) out[k] = (Array.isArray(t[k]) ? t[k] : []).filter(x => x && typeof x === "object" && typeof x.id === "string" && x.id);
+  return out;
+}
+function loadTracker(){ try { return cleanTracker(JSON.parse(localStorage.getItem(TKEY))); } catch(e){ return emptyTracker(); } }
+
+async function pushTracker(){
+  if (!DISK.on) return;
+  if (TDISK.busy){ TDISK.again = true; return; }
+  const body = JSON.stringify(TK);
+  if (body === TDISK.sent) return;
+  TDISK.busy = true;
+  try {
+    const r = await fetch("api/tracker", {method:"PUT", headers:{"Content-Type":"application/json"}, body:`{"baseRev":${JSON.stringify(TDISK.rev)},"tracker":${body}}`});
+    if (r.status === 409){ // another window or port saved first: merge, then save again
+      const cur = await r.json(), theirs = cleanTracker(cur.tracker);
+      TK = mergeTracker3(TDISK.base, theirs, TK);
+      TDISK.rev = cur.rev; setTSent(theirs); TDISK.again = true;
+      refreshViews();
+    } else if (r.ok){
+      TDISK.rev = (await r.json()).rev; setTSent(JSON.parse(body)); netDown(false);
+    } else throw new Error(`HTTP ${r.status}`);
+  } catch(e){
+    netDown(true); TDISK.busy = false; clearTimeout(TDISK.timer); TDISK.timer = setTimeout(pushTracker, 4000); return;
+  }
+  TDISK.busy = false;
+  if (TDISK.again){ TDISK.again = false; pushTracker(); }
+}
+function flushTracker(){
+  if (!trackerDirty()) return;
+  const body = `{"baseRev":${JSON.stringify(TDISK.rev)},"tracker":${JSON.stringify(TK)}}`;
+  try { fetch("api/tracker", {method:"PUT", headers:{"Content-Type":"application/json"}, body, keepalive:body.length < 60000}); } catch(e){}
+}
+async function syncTracker(info){
+  if (TDISK.busy || !info.trackerRev || info.trackerRev === TDISK.rev) return;
+  if (trackerDirty()) return pushTracker();
+  const L = await (await fetch("api/tracker", {cache:"no-store"})).json();
+  if (trackerDirty()) return pushTracker();
+  TK = cleanTracker(L.tracker); TDISK.rev = L.rev; setTSent(TK);
+  refreshViews();
+}
+
+// Three-way merge by id, like the papers' merge3: a change made on only one side wins, removals are honoured unless
+// the other side changed that item. An item changed on both sides takes this window's version, except that a
+// project's update log and milestones are unioned, and a list keeps entries the other window added to its order.
+function mergeById3(b, t, m, both){
+  const B = new Map(b.map(x => [x.id, jsn(x)])), M = new Map(m.map(x => [x.id, x])), T = new Set(t.map(x => x.id)), out = [];
+  for (const x of t){
+    const y = M.get(x.id), bx = B.get(x.id);
+    if (!y){ if (bx === undefined || bx !== jsn(x)) out.push(x); continue; }
+    const mine = bx === undefined || bx !== jsn(y), theirs = bx === undefined || bx !== jsn(x);
+    out.push(mine && theirs && both ? both(bx === undefined ? {} : JSON.parse(bx), x, y) : mine ? y : x);
+  }
+  for (const y of m) if (!T.has(y.id) && (!B.has(y.id) || B.get(y.id) !== jsn(y))) out.push(y);
+  return out;
+}
+function mergeTracker3(base, theirs, mine){
+  const arr = v => Array.isArray(v) ? v : [];
+  return {
+    lists: mergeById3(base.lists, theirs.lists, mine.lists, (b, t, m) => ({...m, order:[...arr(m.order), ...arr(t.order).filter(id => !arr(m.order).includes(id) && !arr(b.order).includes(id))]})),
+    submissions: mergeById3(base.submissions, theirs.submissions, mine.submissions),
+    projects: mergeById3(base.projects, theirs.projects, mine.projects, (b, t, m) => ({...m,
+      updates: mergeById3(arr(b.updates), arr(t.updates), arr(m.updates)).sort((x, y) => (y.at || 0) - (x.at || 0)),
+      milestones: mergeById3(arr(b.milestones), arr(t.milestones), arr(m.milestones))})),
+    myPapers: mergeById3(base.myPapers, theirs.myPapers, mine.myPapers),
+  };
+}
 
 /* ---------------- example library ---------------- */
 function seed(){
@@ -1840,6 +1928,8 @@ async function boot(){
     DISK.on = true; DISK.dir = info.dataDir; DISK.platform = info.platform || ""; idb = diskFiles;
     let ui = null; try { ui = JSON.parse(localStorage.getItem(UIKEY)); } catch(e){}
     const old = load(), L = await (await fetch("api/library", {cache:"no-store"})).json();
+    const LT = await (await fetch("api/tracker", {cache:"no-store"})).json();
+    TK = cleanTracker(LT.tracker); TDISK.rev = LT.rev; setTSent(TK);
     if (L.papers){ S = {papers:L.papers, ui:ui || (old && old.ui) || {}}; DISK.rev = L.rev; DISK.sent = JSON.stringify(L.papers); setBase(L.papers); }
     else { // empty folder: move this browser's 0.1.x library in, or start with the examples
       const start = old && Array.isArray(old.papers) && old.papers.length ? old : seed();
@@ -1854,7 +1944,7 @@ async function boot(){
       if (own) note = `Moved your library (${own} ${own === 1 ? "paper" : "papers"}) into ${DISK.dir}`;
       try { localStorage.setItem(LEFTKEY, "1"); } catch(e){}
     }
-  } else S = load() || seed();
+  } else { S = load() || seed(); TK = loadTracker(); }
   S.ui = Object.assign({view:"home", filter:"all", tab:"notes", nmode:"preview", hlFilter:"all", zoom:1, q:""}, S.ui || {});
   if (S.ui.view === "reader") S.ui.view = "home";
   renderAll();

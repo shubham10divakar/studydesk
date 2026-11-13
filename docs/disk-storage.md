@@ -17,8 +17,9 @@ Default `~/StudyDesk` (on Windows `C:\Users\<you>\StudyDesk`). If that folder do
 ```
 ~/StudyDesk/
 ├─ library.json              every paper: status, tags, highlights, notes, sessions, bookmarks
+├─ tracker.json              submissions, projects and my papers (trackers.md); written only once you use them
 ├─ pdfs/<paper-id>.pdf       real PDF files, one per paper
-└─ backups/library-YYYY-MM-DD.json   copy of library.json taken on the first save of each day; last 14 kept
+└─ backups/library-YYYY-MM-DD.json   copy of library.json taken on the first save of each day; last 14 kept (tracker-YYYY-MM-DD.json likewise)
 ```
 
 `library.json` uses the export format's paper objects (data-model.md) with a header:
@@ -28,9 +29,11 @@ Default `~/StudyDesk` (on Windows `C:\Users\<you>\StudyDesk`). If that folder do
 
 | Method and path | Does |
 |---|---|
-| `GET /api/info` | `{app, version, dataDir, rev}` |
+| `GET /api/info` | `{app, version, dataDir, rev, trackerRev}` |
 | `GET /api/library` | `{rev, papers}`; `papers` is `null` when the folder has no library yet |
 | `PUT /api/library` | body `{baseRev, papers}`. Saves if `baseRev` matches the current `rev`, else `409` with the current `{rev, papers}` |
+| `GET /api/tracker` | `{rev, tracker}`: submissions, projects and my papers ([trackers.md](trackers.md)); `tracker` is `null` until first saved |
+| `PUT /api/tracker` | body `{baseRev, tracker}`; same rev check and `409 {rev, tracker}` as the library, with its own rev |
 | `GET /api/pdf/<id>` | the PDF bytes, `404` if missing |
 | `PUT /api/pdf/<id>` | body is the PDF; saved atomically |
 | `DELETE /api/pdf/<id>` | removes it |

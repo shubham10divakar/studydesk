@@ -126,6 +126,38 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(st, 200)
         self.assertIn(b"StudyDesk", body)
 
+    def test_tracker_save_and_conflict(self):
+        self.assertEqual(self.j("GET", "/api/tracker"), (200, {"rev": "0", "tracker": None}))
+        self.assertEqual(self.j("GET", "/api/info")[1]["trackerRev"], "0")
+        tr = {"lists": [{"id": "l1", "section": "submissions", "name": "Q1 journals", "order": ["s1"]}],
+              "submissions": [{"id": "s1", "list": "l1", "title": "Journal of Things", "details": "héllo"}],
+              "projects": [], "myPapers": []}
+        st, r = self.j("PUT", "/api/tracker", {"baseRev": "0", "tracker": tr})
+        self.assertEqual(st, 200)
+        rev1 = r["rev"]
+        self.assertEqual(self.j("GET", "/api/tracker")[1], {"rev": rev1, "tracker": tr})
+        self.assertEqual(self.j("GET", "/api/info")[1]["trackerRev"], rev1)
+        doc = json.loads((self.store.root / "tracker.json").read_text(encoding="utf-8"))
+        self.assertEqual((doc["format"], doc["formatVersion"], doc["submissions"]), ("studydesk-tracker", 1, tr["submissions"]))
+        # the tracker has its own rev: saving it doesn't touch library.json, and the library's rev doesn't block it
+        self.assertFalse((self.store.root / "library.json").exists())
+        self.assertEqual(self.j("PUT", "/api/library", {"baseRev": "0", "papers": []})[0], 200)
+        st, r = self.j("PUT", "/api/tracker", {"baseRev": "0", "tracker": {}})
+        self.assertEqual((st, r), (409, {"rev": rev1, "tracker": tr}))
+        # missing collections are saved as empty lists
+        st, r = self.j("PUT", "/api/tracker", {"baseRev": rev1, "tracker": {"projects": [{"id": "p1"}]}})
+        self.assertEqual(st, 200)
+        self.assertEqual(self.j("GET", "/api/tracker")[1]["tracker"], {"lists": [], "submissions": [], "projects": [{"id": "p1"}], "myPapers": []})
+        self.assertEqual(len(list((self.store.root / "backups").glob("tracker-*.json"))), 1)
+        self.assertFalse(list(self.store.root.glob(".tmp-*")), "no temp files left behind")
+
+    def test_bad_tracker_body(self):
+        self.assertEqual(self.j("PUT", "/api/tracker", {"tracker": {}})[0], 400)
+        self.assertEqual(self.j("PUT", "/api/tracker", {"baseRev": "0", "tracker": []})[0], 400)
+        self.assertEqual(self.j("PUT", "/api/tracker", {"baseRev": "0", "tracker": {"projects": "nope"}})[0], 400)
+        self.assertEqual(self.req("PUT", "/api/tracker", {"baseRev": "0", "tracker": {}}, {"Origin": "https://evil.example"})[0], 403)
+        self.assertFalse((self.store.root / "tracker.json").exists())
+
     def test_two_processes_share_a_folder(self):
         # a second Store on the same folder (another studydesk on another port) sees the first one's writes
         other = Store(self.store.root)

@@ -65,6 +65,7 @@ There are two storage backends behind one interface (`save()` and the `idb` help
 ```
 ~/StudyDesk/                       (or --data-dir / $STUDYDESK_DATA; printed at startup, shown on About)
 ├─ library.json                  {"format":"pdfdesk-library","formatVersion":1,"savedAt":…,"papers":[…]}
+├─ tracker.json                  {"format":"studydesk-tracker",…} submissions, projects, my papers (trackers.md); own rev, saved by tsave()
 ├─ pdfs/<paper-id>.pdf           real PDF files
 └─ backups/library-YYYY-MM-DD.json   first save of each day; last 14 kept
 ```
