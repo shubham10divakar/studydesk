@@ -14,7 +14,7 @@ const srv = spawn("python", ["-m", "studydesk", "--port", String(APP_PORT), "--d
 for (let i = 0; i < 40; i++) { try { await fetch(app + "api/info"); break; } catch (e) { await wait(250); } }
 
 // ---------- DevTools helpers, one connection per tab ----------
-async function tab(url) {
+async function tab(url, fresh) {
   const t = await (await fetch(`http://127.0.0.1:${port}/json/new?${encodeURIComponent(url)}`, { method: "PUT" })).json();
   const ws = new WebSocket(t.webSocketDebuggerUrl); await new Promise(r => ws.addEventListener("open", r, { once: true }));
   let id = 0; const pend = new Map(), errs = [];
@@ -24,6 +24,7 @@ async function tab(url) {
   await cdp("Page.enable"); await cdp("Runtime.enable"); await cdp("Emulation.setFocusEmulationEnabled", { enabled: true });
   await cdp("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await wait(1800);
+  if (fresh) { await cdp("Storage.clearDataForOrigin", { origin: new URL(url).origin, storageTypes: "all" }); await cdp("Page.reload"); await wait(1800); }   // browser-mode origins start empty on every run
   const click = async sel => { await js(`(() => { const el = ${sel}; if (!el) throw new Error("no element: " + ${JSON.stringify(sel)}); el.click(); })()`); await wait(250); };
   const fill = async (id, v) => { await js(`(() => { const i = document.getElementById(${JSON.stringify(id)}); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event("input", {bubbles:true})); i.dispatchEvent(new Event("change", {bubbles:true})); })()`); };
   const key = async k => { for (const type of ["keyDown", "keyUp"]) await cdp("Input.dispatchKeyEvent", { type, key: k, windowsVirtualKeyCode: { Escape: 27, Enter: 13 }[k] }); await wait(200); };
@@ -348,7 +349,7 @@ try {
     // browser mode (static server): images go to IndexedDB and come back after a reload
     const st = spawn("node", ["scripts/serve.mjs", "5198"], { stdio: "ignore" }); await wait(1200);
     try {
-      const C = await tab("http://localhost:5198/");
+      const C = await tab("http://localhost:5198/", true);
       await C.click(btn("tk-subs", "all")); await C.click(btn("sub-new"));
       await C.fill("sfUrl", "https://static.example.org/call"); await C.fill("sfTitle", "Browser-mode call");
       await setFile(C, "#xfImgIn", pngPath); await C.click(btn("sub-save")); await wait(600);
@@ -380,7 +381,7 @@ try {
 
     const st = spawn("node", ["scripts/serve.mjs", "5196"], { stdio: "ignore" }); await wait(1200);
     try {
-      const D = await tab("http://localhost:5196/");
+      const D = await tab("http://localhost:5196/", true);
       await setFile(D, "#impIn", zipPath); await wait(600);
       const sum = await D.js(`document.querySelector('.mdl-sum').textContent`);
       check(new RegExp(`${T0.submissions.length} submissions, 1 project and 2 papers of your own: ${T0.submissions.length + 3} new`).test(sum.replace(/\s+/g, " ")), `the import dialog counts the tracker entries (${sum.replace(/\s+/g, " ").trim()})`);
