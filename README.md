@@ -167,8 +167,17 @@ A *Projects* section for everything you're working on: research, software, open 
 - **All its links in one place:** the GitHub repository (shown as `owner/name`) and any others you add: docs, demo, PyPI, Overleaf, dataset.
 - **Nothing forgotten:** an active project with no update in 14 days is marked, and a filter lists them all.
 - Version, start and target dates, tags, people and Markdown notes; your own lists in priority order, like submissions.
+- **Its papers:** the papers the project produces, and the papers from your library you're reading for it.
 
-Submissions and projects are saved in `tracker.json` in your library folder. *Export library* doesn't include them yet.
+## Your own papers, and where they're going
+
+*My papers* keeps the manuscripts you're writing: status (*Idea* to *Published*), target date, project, notes and an optional draft PDF.
+
+- **Aim each one:** in a submission's form, pick a 1st, 2nd and 3rd choice paper. Each paper then lists where it's aimed, and each submission says who it's for.
+- **Record what went in:** *Mark as submitted* takes the 1st choice (change it in the form), moves that paper to *Submitted*, and the paper shows where it was submitted and how that stands.
+- Filter submissions by one of your papers to see every place it could go.
+
+Submissions, projects and your papers are saved in `tracker.json` in your library folder (draft PDFs in `pdfs/`). *Export library* doesn't include them yet.
 
 ## Back up and move your library
 

@@ -358,6 +358,10 @@ function renderSide(){
         <button class="nav-i nav-add" data-act="list-new" data-v="projects">+ New list</button>
       </nav>
     </div>
+    <div>
+      <div class="nav-h">Writing</div>
+      <nav class="nav"><button class="nav-i ${S.ui.view==="mypapers"?"on":""}" data-act="mypapers">My papers<span class="ct">${TK.myPapers.length}</span></button></nav>
+    </div>
     <div class="nav tagsnav">
       <div class="nav-h">Tags</div>
       ${Object.entries(tags).sort((a,b)=>b[1]-a[1]).map(([t,c]) => `<button class="nav-i ${f==="tag:"+t?"on":""}" data-act="filter" data-v="tag:${esc(t)}"><span class="num" style="color:var(--faint)">#</span>${esc(t)}<span class="ct">${c}</span></button>`).join("")}
@@ -477,7 +481,7 @@ function libHTML(){
 
 function renderMain(){
   const m = $("#main"); m.classList.remove("is-reader");
-  m.innerHTML = S.ui.view === "library" ? libHTML() : S.ui.view === "about" ? aboutHTML() : S.ui.view === "subs" ? subsHTML() : S.ui.view === "projects" ? projsHTML() : S.ui.view === "project" ? projectHTML() : homeHTML();
+  m.innerHTML = S.ui.view === "library" ? libHTML() : S.ui.view === "about" ? aboutHTML() : S.ui.view === "subs" ? subsHTML() : S.ui.view === "projects" ? projsHTML() : S.ui.view === "project" ? projectHTML() : S.ui.view === "mypapers" ? myPapersHTML() : homeHTML();
   m.scrollTop = 0;
 }
 function renderAll(){ renderSide(); if (S.ui.view === "reader" && R) renderPanel(); else renderMain(); applyLayout(); }
@@ -563,13 +567,19 @@ const FEATURES = [
     "Your own lists, each in priority order: drag an entry by its number, or use the arrows or Alt+↑ / Alt+↓",
     "All submissions shows every list by nearest deadline; filter by kind, Scopus, status, topic or free to publish now",
     "Mark as submitted in one click; status runs from Considering to Accepted or Rejected"]],
+  ["My papers", [
+    "Your own manuscripts with status, target date, project, notes and an optional draft PDF",
+    "Pick a 1st, 2nd and 3rd choice paper for each submission; each paper lists where it's aimed",
+    "Mark as submitted records which paper went in and moves it to Submitted",
+    "Filter submissions by one of your papers"]],
   ["Projects", [
     "Keep what you're working on in your own lists, in priority order",
     "A dated update log: the newest line shows on the card with how long ago it was; status changes are logged too",
     "Next step with a due date, and milestones you tick off; ones due within a week are flagged",
     "GitHub repository shown as owner/name, plus any other links: docs, demo, PyPI, Overleaf, dataset",
     "Version, start and target dates, tags, people and Markdown notes",
-    "Active projects with no update in 14 days are marked, and a filter finds them"]],
+    "Active projects with no update in 14 days are marked, and a filter finds them",
+    "A project lists the papers it produces and the library papers you read for it"]],
   ["Export and import", [
     "Export the whole library as one .zip: PDFs, highlights, notes, sessions, plus a readable Markdown file per paper with its link and abstract",
     "A small backup without PDFs for frequent saves",
@@ -1240,7 +1250,7 @@ function showImportDialog(step){
 function closeModal(){
   const m = $("#modal"); m.hidden = true; m.innerHTML = ""; IMP = null;
   if (LINK && LINK.hasFile && !LINK.saved) idb.del(LINK.id);   // Add by link looked up an arXiv PDF, then was cancelled
-  LINK = null; SUBF = null; LISTF = null; PF = null;
+  LINK = null; SUBF = null; LISTF = null; PF = null; MF = null;
 }
 
 function mergeInto(cur, inc, stamp){
@@ -1801,6 +1811,7 @@ function subRow(x, rank, showList, moves){
       <div class="tk-top"><span class="tk-kind">${labelOf(SUB_KINDS, x.kind)}</span>${x.indexing === "scopus" ? '<span class="tk-badge">Scopus</span>' : x.indexing === "none" ? '<span class="tk-badge off">Not Scopus</span>' : ""}</div>
       <button class="tk-t" data-act="sub-edit" data-v="${x.id}">${esc(x.title || linkHost(x.url) || "Untitled")}</button>
       ${meta.length ? `<div class="tk-m">${meta.join("")}</div>` : ""}
+      ${subPapersLine(x)}
       ${x.details ? `<p class="tk-d">${esc(plainText(x.details))}</p>` : ""}
       ${(x.topics || []).length ? `<div class="row">${x.topics.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}
     </div>
@@ -1836,15 +1847,16 @@ function tkStep(id, dir, focusSel){ // focusSel: what to focus in the moved row 
 function rerenderKeep(){ const m = $("#main"), y = m.scrollTop; renderSide(); renderMain(); m.scrollTop = y; }
 
 // Filters for the submission views; kept per browser in S.ui.tkF and shared by every list.
-const TKF0 = {kind:"", idx:"", st:"", topic:"", free:false};
+const TKF0 = {kind:"", idx:"", st:"", topic:"", free:false, paper:""};
 const tkF = () => Object.assign({}, TKF0, S.ui.tkF || {});
 const freeNow = x => !!(x.apc && x.apc.free) || (dayAt(x.zeroApcUntil) ?? 0) >= Date.now();
-const tkFiltered = () => { const f = tkF(); return !!(f.kind || f.idx || f.st || f.topic || f.free); };
+const tkFiltered = () => { const f = tkF(); return !!(f.kind || f.idx || f.st || f.topic || f.free || f.paper); };
 function subFilter(items){
   const f = tkF();
   return items.filter(x => (!f.kind || x.kind === f.kind) && (!f.idx || x.indexing === f.idx)
     && (!f.st || (f.st === "open" ? isOpen(x) : f.st === "sent" ? SENT.has(x.status) : x.status === f.st))
-    && (!f.topic || (x.topics || []).includes(f.topic)) && (!f.free || freeNow(x)));
+    && (!f.topic || (x.topics || []).includes(f.topic)) && (!f.free || freeNow(x))
+    && (!f.paper || (x.targets || []).includes(f.paper) || (x.submitted && x.submitted.paper === f.paper)));
 }
 function subFilterBar(scope){
   const f = tkF(), topics = [...new Set(scope.flatMap(x => x.topics || []))].sort();
@@ -1854,11 +1866,18 @@ function subFilterBar(scope){
     ${sel("tfIdx", "idx", "Indexing", [["", "Any indexing"], ["scopus", "Scopus"], ["none", "Not Scopus"], ["unknown", "Indexing unknown"]])}
     ${sel("tfSt", "st", "Status", [["", "Any status"], ["open", "Not submitted yet"], ["sent", "Submitted or later"], ...SUB_STATUS.map(st => [st[0], st[1]])])}
     ${topics.length || f.topic ? sel("tfTopic", "topic", "Topic", [["", "Any topic"], ...[...new Set([...topics, ...(f.topic ? [f.topic] : [])])].map(t => [t, "#" + t])]) : ""}
+    ${TK.myPapers.length || f.paper ? sel("tfPaper", "paper", "My paper", [["", "Any of my papers"], ...TK.myPapers.map(m => [m.id, m.title.length > 40 ? m.title.slice(0, 38) + "…" : m.title])]) : ""}
     <label class="chk" for="tfFree"><input type="checkbox" id="tfFree" data-tkf="free"${f.free ? " checked" : ""}> Free to publish now</label>
     ${tkFiltered() ? `<button class="btn sm ghost" data-act="tkf-clear">Clear filters</button>` : ""}
   </div>`;
 }
 
+function subPapersLine(x){
+  const sp = x.submitted && x.submitted.paper && getMP(x.submitted.paper);
+  if (sp) return `<div class="mp-aims"><span class="mp-k">Sent</span><button class="path-link" data-act="mp-edit" data-v="${sp.id}">${esc(sp.title)}</button></div>`;
+  const tg = (x.targets || []).map((id, i) => id && getMP(id) ? `<span>${CHOICE[i]} <button class="path-link" data-act="mp-edit" data-v="${id}">${esc(getMP(id).title)}</button></span>` : "").filter(Boolean);
+  return tg.length ? `<div class="mp-aims"><span class="mp-k">For</span>${tg.join("")}</div>` : "";
+}
 function subsHTML(){
   const l = S.ui.tkList !== "all" ? getList(S.ui.tkList) : null;
   const scope = l ? listItems(l) : TK.submissions.slice().sort((a, b) => (dueAt(a.deadline) ?? Infinity) - (dueAt(b.deadline) ?? Infinity) || (a.addedAt || 0) - (b.addedAt || 0));
@@ -1911,15 +1930,19 @@ function showSubForm(id, listId){
         <label class="lbl" for="sfTo">Ends<input class="in" id="sfTo" type="date" ${val(c.to)}></label>
         <label class="lbl" for="sfPlace">Place<input class="in" id="sfPlace" autocomplete="off" placeholder="City, or Online" ${val(c.place)}></label></div>
     </fieldset>
+    <div class="lbl">Papers to target${TK.myPapers.length ? `<div class="three">${[0, 1, 2].map(i => `<label class="lbl" for="sfT${i}">${CHOICE[i]} choice<select class="in" id="sfT${i}"><option value="">None</option>${mpOpts((x?.targets || [])[i])}</select></label>`).join("")}</div>`
+      : `<span class="hint">Add the papers you're writing under My papers, then pick a 1st, 2nd and 3rd choice here.</span>`}</div>
     <div class="two"><label class="lbl" for="sfStatus">Status<select class="in" id="sfStatus">${SUB_STATUS.map(([k, lb]) => `<option value="${k}"${k === st ? " selected" : ""}>${lb}</option>`).join("")}</select></label>
-      <label class="lbl" for="sfSubOn" id="sfSubWrap"${SENT.has(st) ? "" : " hidden"}>Submitted on<input class="in" id="sfSubOn" type="date" ${val(x?.submitted?.date)}></label></div>
-    <label class="lbl" for="sfList">List<select class="in" id="sfList">${lists.length ? lists.map(l => `<option value="${l.id}"${l.id === inList ? " selected" : ""}>${esc(l.name)}</option>`).join("") : `<option value="">Where to submit (a new list)</option>`}</select></label>
+      <label class="lbl" for="sfList">List<select class="in" id="sfList">${lists.length ? lists.map(l => `<option value="${l.id}"${l.id === inList ? " selected" : ""}>${esc(l.name)}</option>`).join("") : `<option value="">Where to submit (a new list)</option>`}</select></label></div>
+    <div class="two" id="sfSubWrap"${SENT.has(st) ? "" : " hidden"}><label class="lbl" for="sfSubOn">Submitted on<input class="in" id="sfSubOn" type="date" ${val(x?.submitted?.date)}></label>
+      ${TK.myPapers.length ? `<label class="lbl" for="sfSubPaper">Paper submitted<select class="in" id="sfSubPaper"><option value="">Not recorded</option>${mpOpts(x?.submitted?.paper)}</select></label>` : ""}</div>
     <label class="lbl" for="sfDetails">Details<textarea class="in" id="sfDetails" rows="4" placeholder="Scope, page limit, review time, who to contact. Markdown works.">${esc(x?.details || "")}</textarea></label>
     <p class="hint" id="sfMsg" role="status"></p>
     <div class="mdl-foot" id="sfFoot">${sfFoot(!!x)}</div>
   </div>`;
   m.hidden = false; SUBF.init = subSnap(); $(x ? "#sfTitle" : "#sfUrl").focus();
 }
+const mpOpts = sel => TK.myPapers.map(m => `<option value="${m.id}"${m.id === sel ? " selected" : ""}>${esc(m.title)}</option>`).join("");
 const sfFoot = editing => `${editing ? `<button class="btn ghost danger tk-del" data-act="sub-del">Delete</button>` : ""}<button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="sub-save">${editing ? "Save" : "Add submission"}</button>`;
 const subSnap = () => JSON.stringify([SUBF.kind, SUBF.indexing, SUBF.topics, [...document.querySelectorAll("#sfForm input.in:not(.tag-in), #sfForm select, #sfForm textarea")].map(i => i.value), [...document.querySelectorAll("#sfForm input[type=checkbox]")].map(i => i.checked)]);
 const subDirty = () => !!(SUBF && $("#sfForm") && subSnap() !== SUBF.init);
@@ -1929,7 +1952,11 @@ function sfSeg(act, v){
   if (act === "sf-kind") $("#sfConf").hidden = v !== "conference";
 }
 function sfChanged(t){
-  if (t.id === "sfStatus"){ const sent = SENT.has(t.value); $("#sfSubWrap").hidden = !sent; if (sent && !$("#sfSubOn").value) $("#sfSubOn").value = isoDay(Date.now()); }
+  if (t.id === "sfStatus"){
+    const sent = SENT.has(t.value), sp = $("#sfSubPaper"); $("#sfSubWrap").hidden = !sent;
+    if (sent && !$("#sfSubOn").value) $("#sfSubOn").value = isoDay(Date.now());
+    if (sent && sp && !sp.value) sp.value = [0, 1, 2].map(i => $("#sfT" + i).value).find(Boolean) || "";   // the 1st choice, unless you pick another
+  }
   if (t.id === "sfFree"){ $("#sfApc").disabled = $("#sfCur").disabled = t.checked; }
 }
 function subSave(){
@@ -1946,11 +1973,13 @@ function subSave(){
     apc:$("#sfFree").checked ? {free:true} : amt ? {amount:+amt, currency:(v("sfCur") || "USD").toUpperCase()} : null,
     zeroApcUntil:v("sfZero"),
     conf:SUBF.kind === "conference" ? {abstract:v("sfAbs"), notification:v("sfNotif"), cameraReady:v("sfCam"), from:v("sfFrom"), to:v("sfTo"), place:v("sfPlace")} : (old?.conf || null),
-    status:st, submitted:SENT.has(st) ? {date:v("sfSubOn") || isoDay(Date.now()), paper:old?.submitted?.paper ?? null} : null,
+    targets:$("#sfT0") ? [0, 1, 2].map(i => v("sfT" + i) || null) : (old?.targets || [null, null, null]),
+    status:st, submitted:SENT.has(st) ? {date:v("sfSubOn") || isoDay(Date.now()), paper:$("#sfSubPaper") ? v("sfSubPaper") || null : old?.submitted?.paper ?? null} : null,
     details:$("#sfDetails").value.trim(), updatedAt:Date.now()});
   if (was && was !== l.id){ const pl = getList(was); if (pl) pl.order = (pl.order || []).filter(i => i !== x.id); }
   if (!(l.order || (l.order = [])).includes(x.id)) l.order.push(x.id);
   if (!old) TK.submissions.push(x);
+  if (x.submitted && x.submitted.paper && x.submitted.paper !== old?.submitted?.paper) mpSent(x.submitted.paper);
   tsave(); SUBF = null; closeModal();
   if (S.ui.view !== "subs" || (S.ui.tkList !== "all" && S.ui.tkList !== l.id)){ closeReader(); S.ui.view = "subs"; S.ui.tkList = l.id; save(); }
   renderAll();
@@ -1964,8 +1993,9 @@ function subDelete(){
 }
 function subMark(id){
   const x = getSub(id); if (!x) return;
-  x.status = "submitted"; x.submitted = {date:isoDay(Date.now()), paper:x.submitted?.paper ?? null}; x.updatedAt = Date.now();
-  tsave(); renderAll(); toast(`Marked “${x.title}” as submitted today. Change the date in its edit form.`);
+  const paper = x.submitted?.paper ?? (x.targets || []).find(id => id && getMP(id)) ?? null;
+  x.status = "submitted"; x.submitted = {date:isoDay(Date.now()), paper}; x.updatedAt = Date.now(); if (paper) mpSent(paper);
+  tsave(); renderAll(); toast(`Marked “${x.title}” as submitted today${paper ? ` with “${mpTitle(paper)}”` : ""}. Change it in the edit form.`);
 }
 
 let LISTF = null; // the open list form: {section, id}
@@ -2034,7 +2064,8 @@ function projLinks(p, cls){
 function projRow(p, rank, showList, moves){
   const u = (p.updates || [])[0], l = getList(p.list), ms = nextMilestone(p), st = staleDays(p);
   const msTxt = ms ? (() => { const t = dayAt(ms.due), d = daysTo(t); return `<span class="${d < 0 ? "over" : d <= 7 ? "warn" : ""}">Milestone: ${esc(ms.title)}, ${d < 0 ? `${-d} days overdue` : d === 0 ? "due today" : `due ${fmtDate(t)}`}</span>`; })() : "";
-  const meta = [projLinks(p, "tk-lk"), p.version ? `<span class="num">v${esc(p.version.replace(/^v/i, ""))}</span>` : "", msTxt, showList && l ? `<span>in ${esc(l.name)}</span>` : ""].filter(Boolean);
+  const nmp = TK.myPapers.filter(m => m.project === p.id).length;
+  const meta = [projLinks(p, "tk-lk"), nmp ? `<span>${nmp} of my papers</span>` : "", p.version ? `<span class="num">v${esc(p.version.replace(/^v/i, ""))}</span>` : "", msTxt, showList && l ? `<span>in ${esc(l.name)}</span>` : ""].filter(Boolean);
   return `<div class="tk-row${rank ? "" : " no-rank"}" data-id="${p.id}">
     ${rank ? rankCell(p, rank, moves) : ""}
     <div class="tk-body">
@@ -2099,6 +2130,7 @@ function projectHTML(){
         <section class="card" aria-labelledby="pm-h"><h3 id="pm-h">Milestones</h3>
           ${msHTML ? `<ul class="pm-list">${msHTML}</ul>` : ""}
           <div class="pn"><label class="vh" for="pmTitle">New milestone</label><input class="in" id="pmTitle" autocomplete="off" placeholder="New milestone"><label class="vh" for="pmDue">Due</label><input class="in" id="pmDue" type="date"><button class="btn sm" data-act="pm-add">Add</button></div></section>
+        ${projPapersCard(p)}
         ${kv.length || (p.tags || []).length ? `<section class="card"><h3>Details</h3>${kv.length ? `<dl class="kv">${kv.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}${(p.tags || []).length ? `<div class="row">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>` : ""}</section>` : ""}
       </div>
     </div>
@@ -2177,6 +2209,115 @@ function projDelete(){
   TK.projects = TK.projects.filter(y => y.id !== p.id);
   const l = getList(p.list); if (l) l.order = (l.order || []).filter(i => i !== p.id);
   tsave(); PF = null; closeModal(); S.ui.view = "projects"; S.ui.tkList = l ? l.id : "all"; save(); renderAll(); toast(`Deleted “${p.name}”`);
+}
+
+/* ---------------- my papers ---------------- */
+// Your own manuscripts (spec: docs/trackers.md § My papers). A submission aims a 1st, 2nd and 3rd choice of them
+// (targets) and records which one went in (submitted.paper); a paper names the project it comes from. The draft PDF,
+// if any, is stored like a library PDF under the paper's own id (idb, so pdfs/<id>.pdf under studydesk).
+const MP_STATUS = [["idea","Idea","--s-inbox"],["drafting","Drafting","--s-planned"],["ready","Ready to submit","--s-reading"],["submitted","Submitted","--s-reading"],["review","Under review","--s-paused"],["revising","Revising","--s-paused"],["accepted","Accepted","--s-completed"],["published","Published","--s-completed"]];
+const mpPill = s => { const st = MP_STATUS.find(x => x[0] === s) || MP_STATUS[0]; return `<span class="pill" style="--c:var(${st[2]})">${st[1]}</span>`; };
+const getMP = id => TK.myPapers.find(x => x.id === id);
+const CHOICE = ["1st", "2nd", "3rd"];
+const aimedAt = id => TK.submissions.map(x => ({x, i:(x.targets || []).indexOf(id)})).filter(o => o.i >= 0 && !(o.x.submitted && o.x.submitted.paper === id)).sort((a, b) => a.i - b.i || (dueAt(a.x.deadline) ?? Infinity) - (dueAt(b.x.deadline) ?? Infinity));
+const sentTo = id => TK.submissions.filter(x => x.submitted && x.submitted.paper === id);
+// Sending a paper moves it on from Idea, Drafting or Ready; later steps are yours to set.
+function mpSent(id){ const m = getMP(id); if (m && ["idea","drafting","ready"].includes(m.status)){ m.status = "submitted"; m.updatedAt = Date.now(); } }
+const mpTitle = id => { const m = getMP(id); return m ? m.title : ""; };
+const subLink = x => `<button class="path-link" data-act="sub-edit" data-v="${x.id}">${esc(x.title || linkHost(x.url))}</button>`;
+
+function mpRow(m){
+  const pr = m.project && getProj(m.project), aims = aimedAt(m.id), sent = sentTo(m.id), t = dayAt(m.targetDate);
+  const meta = [pr ? `<span>Project: <button class="path-link" data-act="proj-open" data-v="${pr.id}">${esc(pr.name)}</button></span>` : "",
+    m.hasFile ? `<button class="path-link" data-act="mp-pdf" data-v="${m.id}">Open draft PDF ↗</button>` : ""].filter(Boolean);
+  return `<div class="tk-row no-rank" data-id="${m.id}">
+    <div class="tk-body">
+      <div class="tk-top">${mpPill(m.status)}</div>
+      <button class="tk-t" data-act="mp-edit" data-v="${m.id}">${esc(m.title)}</button>
+      ${meta.length ? `<div class="tk-m">${meta.join("")}</div>` : ""}
+      ${aims.length ? `<div class="mp-aims"><span class="mp-k">Aimed at</span>${aims.map(o => `<span>${CHOICE[o.i]} ${subLink(o.x)}${dueAt(o.x.deadline) && isOpen(o.x) ? ` <span class="num">${fmtDate(dueAt(o.x.deadline))}</span>` : ""}</span>`).join("")}</div>` : ""}
+      ${sent.length ? `<div class="mp-aims"><span class="mp-k">Submitted to</span>${sent.map(x => `<span>${subLink(x)} ${subPill(x.status)}</span>`).join("")}</div>` : ""}
+      ${m.notes ? `<p class="tk-d">${esc(plainText(m.notes))}</p>` : ""}
+    </div>
+    <div class="tk-side">${t ? `<div class="tk-due ${m.status === "idea" || m.status === "drafting" ? (t < Date.now() ? "over" : daysTo(t) <= 7 ? "soon" : "") : ""}"><span>${fmtFull(t)}</span><small>target date</small></div>` : ""}</div>
+  </div>`;
+}
+function myPapersHTML(){
+  const order = MP_STATUS.map(s => s[0]);
+  const items = TK.myPapers.slice().sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || (a.targetDate || "9").localeCompare(b.targetDate || "9"));
+  return `<div class="wrap">
+    <div class="head-row"><div><div class="eyebrow">My papers</div><h1 class="page-h">My papers</h1>
+      <p class="sub">Your own manuscripts, where each one is aimed and where it went. <span class="num">${items.length}</span> ${items.length === 1 ? "paper" : "papers"}.</p></div>
+      <div class="row"><button class="btn primary" data-act="mp-new">+ Add my paper</button></div></div>
+    ${items.length ? `<div class="tk-list">${items.map(mpRow).join("")}</div>`
+      : `<div class="empty">Add the papers you're writing. Then pick them as the 1st, 2nd or 3rd choice for a submission, and each paper here shows where it's aimed and where it went.</div>`}
+  </div>`;
+}
+
+let MF = null; // the open my-paper form: {id, init}
+function showMPForm(id, projectId){
+  const m0 = id ? getMP(id) : null; if (id && !m0) return;
+  MF = {id:m0 ? m0.id : uid()};
+  const prj = m0 ? m0.project : projectId || "";
+  const m = $("#modal");
+  m.innerHTML = `<div class="mdl wide" role="dialog" aria-modal="true" aria-labelledby="mdl-h" id="mfForm">
+    <h2 id="mdl-h">${m0 ? "Edit my paper" : "Add my paper"}</h2>
+    <label class="lbl" for="mfTitle">Working title<input class="in" id="mfTitle" autocomplete="off" value="${esc(m0?.title || "")}"></label>
+    <div class="two"><label class="lbl" for="mfStatus">Status<select class="in" id="mfStatus">${MP_STATUS.map(([k, lb]) => `<option value="${k}"${k === (m0?.status || "drafting") ? " selected" : ""}>${lb}</option>`).join("")}</select></label>
+      <label class="lbl" for="mfTarget">Target date, optional<input class="in" id="mfTarget" type="date" value="${esc(m0?.targetDate || "")}"></label></div>
+    <label class="lbl" for="mfProj">Project<select class="in" id="mfProj"><option value="">None</option>${TK.projects.map(p => `<option value="${p.id}"${p.id === prj ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label>
+    <label class="lbl" for="mfFile">Draft PDF, optional${m0?.hasFile ? ` <span class="hint">A draft is attached. Pick a file to replace it.</span>` : ""}<input class="in mf-file" id="mfFile" type="file" accept="application/pdf,.pdf"></label>
+    ${m0?.hasFile ? `<label class="chk" for="mfNoFile"><input type="checkbox" id="mfNoFile"> Remove the attached draft</label>` : ""}
+    <label class="lbl" for="mfNotes">Notes<textarea class="in" id="mfNotes" rows="4" placeholder="Abstract, co-authors, what's left to do. Markdown works.">${esc(m0?.notes || "")}</textarea></label>
+    <p class="hint">Choose where it's aimed from each submission's form: Papers to target, 1st to 3rd choice.</p>
+    <p class="hint" id="mfMsg" role="status"></p>
+    <div class="mdl-foot" id="mfFoot">${mfFoot(!!m0)}</div>
+  </div>`;
+  m.hidden = false; MF.init = mpSnap(); $("#mfTitle").focus();
+}
+const mfFoot = editing => `${editing ? `<button class="btn ghost danger tk-del" data-act="mp-del">Delete</button>` : ""}<button class="btn ghost" data-act="modal-close">Cancel</button><button class="btn primary" data-act="mp-save">${editing ? "Save" : "Add paper"}</button>`;
+const mpSnap = () => JSON.stringify([...document.querySelectorAll("#mfForm input, #mfForm select, #mfForm textarea")].map(i => i.type === "checkbox" ? i.checked : i.value));
+const mpDirty = () => !!(MF && $("#mfForm") && mpSnap() !== MF.init);
+async function mpSave(){
+  const v = id => ($("#" + id)?.value || "").trim(), msg = $("#mfMsg"), title = v("mfTitle");
+  if (!title){ msg.textContent = "Give the paper a working title."; $("#mfTitle").focus(); return; }
+  const file = $("#mfFile").files[0];
+  if (file && !/pdf$/i.test(file.type || file.name)){ msg.textContent = "The draft has to be a PDF."; return; }
+  const old = getMP(MF.id), id = MF.id;
+  let hasFile = !!(old && old.hasFile);
+  if (file){
+    msg.textContent = "Saving the draft…";
+    try { await idb.putStrict(id, file); hasFile = true; } catch(e){ msg.textContent = "Couldn't save the draft PDF here. Try again, or save without it."; return; }
+  } else if ($("#mfNoFile")?.checked){ idb.del(id); hasFile = false; }
+  const m = Object.assign(old || {id, addedAt:Date.now()}, {title, status:v("mfStatus"), targetDate:v("mfTarget"), project:v("mfProj") || null, notes:$("#mfNotes").value.trim(), hasFile, updatedAt:Date.now()});
+  if (!old) TK.myPapers.push(m);
+  tsave(); MF = null; closeModal(); renderAll(); toast(old ? `Saved “${m.title}”` : `Added “${m.title}” to My papers`);
+}
+function mpDelete(){
+  const m = getMP(MF && MF.id); if (!m) return closeModal();
+  TK.myPapers = TK.myPapers.filter(x => x.id !== m.id);
+  TK.submissions.forEach(x => { if ((x.targets || []).includes(m.id)){ x.targets = x.targets.map(t => t === m.id ? null : t); x.updatedAt = Date.now(); } if (x.submitted && x.submitted.paper === m.id){ x.submitted.paper = null; x.updatedAt = Date.now(); } });
+  if (m.hasFile) idb.del(m.id);
+  tsave(); MF = null; closeModal(); renderAll(); toast(`Deleted “${m.title}”`);
+}
+async function mpOpenPdf(id){
+  const b = await idb.get(id); if (!b){ toast("Couldn't find the draft PDF. Attach it again from the paper's form."); return; }
+  const u = URL.createObjectURL(b.type ? b : new Blob([b], {type:"application/pdf"}));
+  window.open(u, "_blank", "noopener"); setTimeout(() => URL.revokeObjectURL(u), 60000);
+}
+
+// The project page's papers card: my papers from this project, and library papers read for it.
+function projPapersCard(p){
+  const mine = TK.myPapers.filter(m => m.project === p.id), read = (p.papers || []).map(getP).filter(Boolean);
+  const avail = S.papers.filter(x => !(p.papers || []).includes(x.id)).sort((a, b) => a.title.localeCompare(b.title));
+  return `<section class="card" aria-labelledby="pp-h"><h3 id="pp-h">Papers</h3>
+    <div class="pp-sub">My papers from this project</div>
+    ${mine.length ? `<ul class="pp-list">${mine.map(m => `<li><button class="path-link" data-act="mp-edit" data-v="${m.id}">${esc(m.title)}</button>${mpPill(m.status)}</li>`).join("")}</ul>` : ""}
+    <button class="nav-add pp-new" data-act="mp-new" data-v="${p.id}">+ Add my paper</button>
+    <div class="pp-sub">Reading for this project</div>
+    ${read.length ? `<ul class="pp-list">${read.map(x => `<li><button class="path-link" data-act="open" data-v="${x.id}">${esc(x.title)}</button><button class="pu-x" data-act="pp-del" data-v="${x.id}" aria-label="Unlink ${esc(x.title)}">×</button></li>`).join("")}</ul>` : ""}
+    ${avail.length ? `<div class="pn pp-add"><label class="vh" for="ppAdd">Link a paper from your library</label><select class="in" id="ppAdd"><option value="">Link a paper from your library…</option>${avail.map(x => `<option value="${x.id}">${esc(x.title.length > 80 ? x.title.slice(0, 78) + "…" : x.title)}</option>`).join("")}</select><button class="btn sm" data-act="pp-add">Link</button></div>` : ""}
+  </section>`;
 }
 
 /* ---------------- tag picker ---------------- */
@@ -2344,6 +2485,16 @@ document.addEventListener("click", async e => {
     case "pn-save": { const pp = getProj(S.ui.tkItem); if (pp){ const tx = $("#pnText").value.trim(), du = $("#pnDue").value; pp.next = tx ? {text:tx, due:du} : null; projTouch(pp); toast(tx ? "Next step saved" : "Next step cleared"); } break; }
     case "pm-add": { const pp = getProj(S.ui.tkItem), tx = $("#pmTitle").value.trim(); if (!pp) break; if (!tx){ $("#pmTitle").focus(); break; } (pp.milestones = pp.milestones || []).push({id:uid(), title:tx, due:$("#pmDue").value, done:false}); projTouch(pp); $("#pmTitle")?.focus(); break; }
     case "pm-del": { const pp = getProj(S.ui.tkItem); if (pp){ pp.milestones = (pp.milestones || []).filter(m => m.id !== v); projTouch(pp); } break; }
+    case "mypapers": closeReader(); S.ui.view = "mypapers"; save(); renderAll(); break;
+    case "mp-new": showMPForm(null, v); break;
+    case "mp-edit": showMPForm(v); break;
+    case "mp-save": mpSave(); break;
+    case "mp-del": $("#mfFoot").innerHTML = `<span class="tk-confirm">Delete this paper? Submissions aimed at it keep their other choices.</span><button class="btn ghost" data-act="mp-del-no">Keep it</button><button class="btn primary" data-act="mp-del-yes">Delete</button>`; $("#mfFoot .btn.primary").focus(); break;
+    case "mp-del-no": $("#mfFoot").innerHTML = mfFoot(true); break;
+    case "mp-del-yes": mpDelete(); break;
+    case "mp-pdf": mpOpenPdf(v); break;
+    case "pp-add": { const pp = getProj(S.ui.tkItem), id = $("#ppAdd")?.value; if (!pp) break; if (!id){ $("#ppAdd").focus(); break; } (pp.papers = pp.papers || []).push(id); projTouch(pp); toast(`Linked “${getP(id)?.title}”`); break; }
+    case "pp-del": { const pp = getProj(S.ui.tkItem); if (pp){ pp.papers = (pp.papers || []).filter(i => i !== v); projTouch(pp); } break; }
     case "tpf-clear": S.ui.tpF = {...TPF0}; save(); rerenderKeep(); break;
     case "tk-up": tkStep(v, -1, '[data-act="tk-up"]'); break;
     case "tk-down": tkStep(v, 1, '[data-act="tk-down"]'); break;
@@ -2377,7 +2528,7 @@ document.addEventListener("input", e => {
 document.addEventListener("keydown", e => {
   const t = e.target;
   if (t.classList && t.classList.contains("tag-in") && tagKey(e, t)) return;
-  if (e.key === "Escape" && !$("#modal").hidden){ if (formDirty()){ ($("#lkMsg") || $("#sfMsg") || $("#pfMsg")).textContent = "Press Cancel to discard what you've typed."; return; } closeModal(); return; }
+  if (e.key === "Escape" && !$("#modal").hidden){ if (formDirty()){ ($("#lkMsg") || $("#sfMsg") || $("#pfMsg") || $("#mfMsg")).textContent = "Press Cancel to discard what you've typed."; return; } closeModal(); return; }
   if (t.id === "lfName" && e.key === "Enter"){ e.preventDefault(); listSave(); return; }
   if (e.key === "Enter" && (t.id === "puText" || t.id === "pmTitle" || t.id === "pmDue" || t.id === "pnText" || t.id === "pnDue")){ e.preventDefault(); document.querySelector(`[data-act="${t.id === "puText" ? "pu-add" : t.id.startsWith("pm") ? "pm-add" : "pn-save"}"]`)?.click(); return; }
   if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown") && t.closest && t.closest(".tk-list.ordered .tk-row")){ e.preventDefault(); tkStep(t.closest(".tk-row").dataset.id, e.key === "ArrowUp" ? -1 : 1, ".tk-t"); return; }
@@ -2406,7 +2557,7 @@ let rzT; window.addEventListener("resize", () => { clearTimeout(rzT); rzT = setT
 
 $("#fileIn").addEventListener("change", e => { importFiles(e.target.files); e.target.value = ""; });
 $("#impIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) startImport(f); });
-const formDirty = () => linkDirty() || subDirty() || projDirty();
+const formDirty = () => linkDirty() || subDirty() || projDirty() || mpDirty();
 $("#modal").addEventListener("click", e => { if (e.target.id === "modal" && !formDirty()) closeModal(); });
 $("#attachIn").addEventListener("change", e => { const f = e.target.files[0]; e.target.value = ""; if (f) attachFile(f); });
 // Drag a row by its priority number to reorder the list.

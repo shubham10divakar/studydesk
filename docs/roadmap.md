@@ -31,9 +31,9 @@ Still open:
 - [ ] Search inside the PDFs' own text (Phase 2 does this with FTS5; in the prototype it would mean indexing every page on import)
 
 Planned (spec and open questions: [trackers.md](trackers.md)):
-- [ ] **Submissions tracker** (lists, entries, mark as submitted, reorder and filters done; My papers links to come): journals, special issues, book chapters and conferences you could submit to, in your own priority-ordered lists, with deadlines (AoE), APC and zero-APC dates, Scopus or not, status and "mark as submitted"
-- [ ] **Projects tracker** (built except links to papers and My papers, which come with step 5): what you're working on, its status, a dated update log (the latest shows on the card), next step, milestones, GitHub and other links; stale projects marked
-- [ ] **My papers**: your own manuscripts, linked to their 1st/2nd/3rd choice submissions and their project
+- [ ] **Submissions tracker** (built): journals, special issues, book chapters and conferences you could submit to, in your own priority-ordered lists, with deadlines (AoE), APC and zero-APC dates, Scopus or not, status and "mark as submitted"
+- [x] **Projects tracker**: what you're working on, its status, a dated update log (the latest shows on the card), next step, milestones, GitHub and other links; stale projects marked
+- [x] **My papers**: your own manuscripts, linked to their 1st/2nd/3rd choice submissions and their project
 - [ ] **Upcoming**: every deadline and milestone across the trackers, nearest first, also on Overview
 
 ## Distribution: pip (`studydesk`)

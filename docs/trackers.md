@@ -143,7 +143,7 @@ Each step leaves the app working, so building can stop after any of them.
 - [x] 2. Lists and submissions: add, edit, delete, mark as submitted. Sidebar *Submissions* section, list view (`subsHTML`), form (`showSubForm` / `subSave`), list create/rename/delete. Test: `scripts/e2e/trackers.mjs`
 - [x] 3. Reorder by drag (the priority number is the handle), arrows and Alt+↑/↓; filters for kind, indexing, status, topic, free to publish now (`S.ui.tkF`, per browser, shared by all lists)
 - [x] 4. Projects: list view (`projsHTML`), project page (`projectHTML`) with update log, status select, next step, milestones; form (`showProjForm` / `projSave`) with GitHub and other links; stale marker and filter. Linking library papers and My papers comes with step 5
-- [ ] 5. My papers, and linking them to submissions and projects
+- [x] 5. My papers (`myPapersHTML`, `showMPForm` / `mpSave`), papers to target and paper submitted in the submission form, filter by paper, the project page's Papers card (its papers, and library papers read for it). A project's own papers are found by each paper's `project` field; `projects[].myPapers` in the shape below is not used
 - [ ] 6. Upcoming view and the two Overview cards
 - [ ] 7. Images
 - [ ] 8. Export / import of the tracker

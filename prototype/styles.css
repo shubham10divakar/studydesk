@@ -564,3 +564,17 @@ select.in{padding:0 6px}
   .pf-link{grid-template-columns:minmax(0,1fr) auto}
   .pf-link [data-pl="url"]{grid-column:1}
 }
+
+/* ---------- trackers: my papers ---------- */
+.mp-aims{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 12px;font-size:12.5px;color:var(--muted)}
+.mp-k{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--faint)}
+.mp-aims .pill{height:19px;font-size:11px;padding:0 7px}
+.mp-aims .path-link,.tk-m .path-link{font-size:inherit}
+.mf-file{height:auto;padding:5px 8px}
+.pp-sub{font-size:12px;font-weight:500;color:var(--muted)}
+.pp-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.pp-list li{display:flex;align-items:center;gap:8px;justify-content:space-between;min-width:0}
+.pp-list .path-link{text-align:left;min-width:0;overflow-wrap:anywhere}
+.pp-list .pill{height:19px;font-size:11px;padding:0 7px;flex:none}
+.pp-new{text-align:left;width:fit-content;padding:0}
+.pn.pp-add{grid-template-columns:minmax(0,1fr) auto}

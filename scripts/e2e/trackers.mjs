@@ -223,6 +223,56 @@ try {
   await A.click(btn("proj-edit", pid)); await A.click(btn("proj-del")); await A.click(btn("proj-del-yes")); await wait(800);
   check(!(await disk()).projects.some(x => x.id === pid) && /Projects/.test(await A.js(`document.querySelector('.eyebrow').textContent`)), "deleting a project removes it and returns to its list");
 
+  // ---------- my papers, and linking them ----------
+  await A.click(btn("mypapers"));
+  check(/pick them as the 1st, 2nd or 3rd choice/.test(await A.js(`document.querySelector('.empty').textContent`)), "My papers opens, with an explanation when empty");
+  await A.click(btn("tk-subs", "all")); await A.click(byText(".tk-t", "/Chapter call from window B/"));
+  check(/Add the papers you're writing under My papers/.test(await A.js(`document.querySelector('#sfForm').textContent`)), "with no papers yet, the submission form says where to add them");
+  await A.click(btn("modal-close"));
+  const pdfPath = join(work, "draft.pdf"), pdfBytes = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
+  writeFileSync(pdfPath, pdfBytes);
+  await A.click(btn("mypapers")); await A.click(btn("mp-new"));
+  await A.fill("mfTitle", "LLM evaluation survey"); await A.fill("mfProj", await A.js(`[...document.querySelectorAll('#mfProj option')].find(o => /Thesis/.test(o.textContent)).value`));
+  await A.fill("mfTarget", iso(10));
+  const doc = await A.cdp("DOM.getDocument"); const fi = await A.cdp("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "#mfFile" });
+  await A.cdp("DOM.setFileInputFiles", { nodeId: fi.nodeId, files: [pdfPath] });
+  await A.click(btn("mp-save")); await wait(800);
+  await A.click(btn("mp-new")); await A.fill("mfTitle", "Benchmark paper"); await A.click(btn("mp-save")); await wait(400);
+  const mps = (await disk()).myPapers, survey = mps.find(m => /survey/.test(m.title)), bench = mps.find(m => /Benchmark/.test(m.title));
+  check(mps.length === 2 && survey.hasFile && survey.project === "oldproj01", "two papers saved; the survey belongs to the thesis project and has its draft");
+  check(existsSync(join(lib, "pdfs", `${survey.id}.pdf`)) && readFileSync(join(lib, "pdfs", `${survey.id}.pdf`)).equals(pdfBytes), "the draft PDF is in the library folder, byte for byte");
+  check(/Project: Thesis chapter 3/.test(await A.js(`${byText(".tk-row", "/survey/")}.innerText`)) && /Open draft PDF/.test(await A.js(`${byText(".tk-row", "/survey/")}.innerText`)), "the paper's row links its project and its draft");
+
+  await A.click(btn("tk-subs", "all")); await A.click(byText(".tk-t", "/Chapter call from window B/"));
+  await A.fill("sfT0", survey.id); await A.fill("sfT1", bench.id); await A.click(btn("sub-save")); await wait(400);
+  check(/For\s*1st LLM evaluation survey\s*2nd Benchmark paper/i.test(await A.js(`${byText(".tk-row", "/Chapter call/")}.innerText`)), "a submission shows which of my papers it's for, 1st and 2nd choice");
+  await A.fill("tfPaper", bench.id); await wait(200);
+  check(JSON.stringify(await A.js(`[...document.querySelectorAll('.tk-t')].map(b => b.textContent)`)) === '["Chapter call from window B"]', "filtering by one of my papers shows the submissions aimed at it");
+  await A.click(btn("tkf-clear"));
+  await A.click(btn("mypapers"));
+  check(/Aimed at\s*1st Chapter call from window B/i.test(await A.js(`${byText(".tk-row", "/survey/")}.innerText`)) && /Aimed at\s*2nd Chapter call/i.test(await A.js(`${byText(".tk-row", "/Benchmark/")}.innerText`)), "each paper lists where it's aimed, with the choice");
+  await A.click(btn("tk-subs", "all"));
+  await A.click(`${byText(".tk-row", "/Chapter call/")}.querySelector('[data-act="sub-mark"]')`);
+  check(/with “LLM evaluation survey”/.test(await A.js(`document.querySelector('#toast').textContent`)) && /Sent\s*LLM evaluation survey/i.test(await A.js(`${byText(".tk-row", "/Chapter call/")}.innerText`)), "Mark as submitted records the 1st choice as the paper sent");
+  await A.click(btn("mypapers"));
+  const srow = await A.js(`${byText(".tk-row", "/survey/")}.innerText`);
+  check(/Submitted to\s*Chapter call from window B\s*Submitted/i.test(srow) && !/Aimed at/i.test(srow), "the paper says where it was submitted and how that stands (no longer listed as aimed there)");
+  check(/^Submitted/.test(srow) && /^Drafting/.test(await A.js(`${byText(".tk-row", "/Benchmark/")}.innerText`)), "sending it moved the paper from Drafting to Submitted; the 2nd choice paper stays as it was");
+  await A.shot("tk-mypapers");
+
+  await A.click(`${byText(".tk-row", "/survey/")}.querySelector('[data-act="proj-open"]')`);
+  check(/LLM evaluation survey/.test(await A.js(`document.querySelector('.pp-list').textContent`)), "the project page lists the papers it produces");
+  const first = await A.js(`document.querySelector('#ppAdd option:nth-child(2)').value`), firstTitle = await A.js(`document.querySelector('#ppAdd option:nth-child(2)').textContent`);
+  await A.fill("ppAdd", first); await A.click(btn("pp-add"));
+  await wait(600);
+  check(await A.js(`!!document.querySelector('.pp-list [data-act="open"][data-v="${first}"]')`) && (await disk()).projects.find(x => x.id === "oldproj01").papers.includes(first), `a library paper can be linked as reading for the project (${firstTitle})`);
+  await A.click(btn("pp-del", first));
+  check(!(await A.js(`!!document.querySelector('.pp-list [data-act="open"][data-v="${first}"]')`)), "and unlinked again");
+
+  await A.click(btn("mypapers")); await A.click(byText(".tk-t", "/Benchmark/")); await A.click(btn("mp-del")); await A.click(btn("mp-del-yes")); await wait(800);
+  const after = await disk();
+  check(after.myPapers.length === 1 && JSON.stringify(after.submissions.find(x => /Chapter/.test(x.title)).targets) === JSON.stringify([survey.id, null, null]), "deleting a paper clears it from submissions' choices and keeps the others");
+
   await A.cdp("Page.reload"); await wait(2000);
   check(await A.js(`document.querySelector('.tk-nav').innerText.includes("Where to submit")`), "after a reload the sidebar still lists it");
   check(!A.errs.length && !B.errs.length, `no script errors (${[...A.errs, ...B.errs].join(" | ")})`);
