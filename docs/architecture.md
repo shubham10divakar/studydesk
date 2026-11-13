@@ -56,6 +56,9 @@ After the text layer, `drawLinks` asks PDF.js for the page's link annotations an
 ### Sessions
 A 1-second ticker adds to `R.session.active` only if the tab is visible and there was input in the last 3 minutes. `endSession(note)` writes a record if at least 1 minute passed, the page range changed, or a note was given. It runs on leaving the reader, opening another paper, "Log session", and `pagehide`.
 
+### Trackers
+Submissions, projects and my papers ([trackers.md](trackers.md)) live in `TK`, a second document next to `S.papers`, saved by `tsave()` to `tracker.json` (or `studydesk.tracker.v1` in a browser) with its own rev, push, sync and three-way merge (`mergeTracker3`). Sections of `app.js`: `tracker storage`, `submissions tracker`, `projects tracker`, `my papers`, `upcoming`, `images on tracker entries`. Lists are shared: `listItems(l)` gives a list's entries in priority order, `tkMove` reorders, and drag, the arrows and Alt+↑/↓ all go through it. Views are `S.ui.view` = `subs`, `projects`, `project`, `mypapers`, `upcoming`; forms are modals with their own draft state (`SUBF`, `PF`, `MF`, `LISTF`). Images go through the `images` helper (`/api/image/` or IndexedDB) and load after each render (`hydrateImages`).
+
 ### Where your data lives
 
 There are two storage backends behind one interface (`save()` and the `idb` helper). `boot()` picks one at startup. Spec: [disk-storage.md](disk-storage.md), decision D-010.

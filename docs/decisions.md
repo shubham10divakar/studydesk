@@ -57,3 +57,8 @@ PDFDesk is renamed StudyDesk: product, PyPI package and command `studydesk`, rep
 Kept on purpose: the browser storage keys (D-007, plus `pdfdesk.ui.v1` and `pdfdesk.browserChecked`), the file format ids `pdfdesk-library` and `pdfdesk-export`, and the user's library folder: with no `~/StudyDesk`, an existing `~/PDFDesk` (or `$PDFDESK_DATA`) is used as it is.
 *Why:* the app is growing from a PDF reader into a desk for everything you study (links, PDFs, documents, notes), and "PDF" in the name no longer fits. The initials are the author's. Nothing a user already has may look empty or fail to import after the switch.
 
+
+## D-014 · Trackers live in their own file, tracker.json (2026-11-13)
+Submissions, projects and my papers (trackers.md) are a second document, `tracker.json` next to `library.json`, with its own rev, API (`/api/tracker`), backups, three-way merge and format id `studydesk-tracker`; in a browser, localStorage `studydesk.tracker.v1`. Images on entries are files in `images/`, PNG, JPEG, WebP or GIF only, checked by their first bytes. Exports carry the tracker as `tracker.json` in the zip (inline as `"tracker"` in a backup without PDFs) under the unchanged `pdfdesk-export` format.
+Kept simple on purpose: one list per entry, GitHub details typed by hand (no new lookup hosts, D-011 unchanged), no calendar export.
+*Why:* studydesk 1.2.0 rewrites `library.json` with papers only, so trackers stored there would vanish the first time an older version opened the folder. A separate file is ignored by older versions, and older exports and importers keep working. No SVG, because an image served from the app's own origin must not be able to carry script.

@@ -1,6 +1,6 @@
 # Trackers: submissions, projects, my papers (plan)
 
-Status: **being built, step by step** (progress under Build order). Agreed 2026-11-13; kept simple on purpose, see Decisions at the end.
+Status: **built** (unreleased, under *Unreleased* in CHANGELOG.md). Agreed 2026-11-13; kept simple on purpose, see Decisions at the end. The exact data shape is in [data-model.md](data-model.md) § Trackers JSON.
 
 StudyDesk today records what you read. The trackers record what you *make* and where it goes:
 
@@ -88,54 +88,24 @@ Small on purpose: title, status (Idea, Drafting, Ready, Submitted, Under review,
 ~/StudyDesk/
 ├─ library.json        (unchanged)
 ├─ tracker.json        {"format":"studydesk-tracker","formatVersion":1,"savedAt":…, lists, submissions, projects, myPapers}
-├─ images/<id>.<ext>   optional images (png, jpg, webp; size-capped)
+├─ images/<id>.<ext>   optional images (png, jpg, webp, gif; up to 10 MB)
 ├─ pdfs/<id>.pdf       my-paper drafts go here too, under their own ids
 └─ backups/tracker-YYYY-MM-DD.json
 ```
 
 The format id is new, so it can use the StudyDesk name; D-013 only fixes the existing ids.
 
-```jsonc
-{
-  "lists": [{"id":"…","section":"submissions","name":"Q1 journals","order":["sub-id", "…"]}],
-  "submissions": [{
-    "id":"…","list":"list-id","kind":"journal",        // journal|special|chapter|conference
-    "title":"…","url":"https://…","image":null,       // image id or null
-    "details":"markdown…","topics":["llm"],
-    "indexing":"scopus",                                // scopus|none|unknown
-    "targets":["mypaper-1","mypaper-2",null],           // 1st, 2nd, 3rd choice
-    "deadline":{"date":"2027-01-15","time":"23:59","aoe":true},
-    "apc":{"amount":1800,"currency":"USD"},             // or {"free":true}
-    "zeroApcUntil":"2026-12-31",
-    "conf":{"abstract":null,"paper":null,"notification":null,"cameraReady":null,"from":null,"to":null,"place":""},
-    "status":"considering",
-    "submitted":{"date":"…","paper":"mypaper-1"},       // or null
-    "addedAt":0,"updatedAt":0
-  }],
-  "projects": [{
-    "id":"…","list":"list-id","name":"…","summary":"…","kind":"software","status":"active",
-    "updates":[{"id":"…","at":0,"text":"Released 1.2.0","status":null}],
-    "next":{"text":"…","due":null},
-    "milestones":[{"id":"…","title":"…","due":"2026-12-01","done":false}],
-    "github":"owner/name","links":[{"label":"PyPI","url":"…"}],"version":"1.2.0",
-    "started":"2026-11-03","targetDate":null,"tags":[],"people":"","image":null,"notes":"",
-    "papers":["library-paper-id"],"myPapers":["mypaper-id"],
-    "addedAt":0,"updatedAt":0
-  }],
-  "myPapers": [{"id":"…","title":"…","status":"drafting","targetDate":null,"hasFile":false,"project":null,"notes":"","addedAt":0,"updatedAt":0}]
-}
-```
+The full shape, field by field, is in [data-model.md](data-model.md) § Trackers JSON, with proposed SQLite tables for 2.x.
 
 - **Server**: `GET/PUT /api/tracker` with the same rev check, atomic write, daily backup and Host/Origin rules as `/api/library`; `GET/PUT/DELETE /api/image/<id>` like PDFs (same id pattern, content type checked, size cap).
 - **Two windows**: a 409 merges three ways like papers do (`mergeTracker3` in `app.js`): by id, a change made on only one side wins, and removals are honoured unless the other side changed that entry. An entry changed in both windows takes this window's version, except that a project's update log and milestones are unioned by id, and a list's order keeps entries the other window added.
 - **Browser-storage mode**: a new localStorage key `studydesk.tracker.v1`; images in the existing IndexedDB under prefixed ids.
 - **Code**: `Store.read_tracker` / `write_tracker` in `studydesk/store.py`; the `tracker storage` section of `app.js` (`TK` is the tracker, `tsave()` / `tsaveSoon()` its save, `TDISK` the disk state). `GET /api/info` also returns `trackerRev`, so coming back to a window picks up tracker changes made elsewhere.
-- **Export / import**: the zip adds `tracker.json`, `images/` and `tracker.md` (readable). Import merges with the rules above. Older StudyDesk versions ignore the extra files.
-- `data-model.md` gets these tables before Phase 2, so the SQLite schema includes them.
+- **Export / import**: the zip adds `tracker.json`, `images/`, drafts in `pdfs/` and `tracker.md` (readable); merge rules in [export-import.md](export-import.md). Older StudyDesk versions ignore the extra files.
 
 ## Build order
 
-One commit per step, pushed, shown working (e2e + screenshot). Docs in one commit at the end.
+One commit per step, pushed, shown working (e2e + screenshot), each with the docs it touches.
 
 Each step leaves the app working, so building can stop after any of them.
 
@@ -147,9 +117,9 @@ Each step leaves the app working, so building can stop after any of them.
 - [x] 6. Upcoming view (`upcomingItems`, `upcomingHTML`) and the Overview cards (`homeTrackersHTML`). A submission's deadlines count while it's open; once sent, its notification, camera-ready and conference dates take over. Passed milestones, next steps and paper targets stay as Overdue; a passed submission deadline drops out (closed)
 - [x] 7. Images: `/api/image/<id>` (PUT/GET/DELETE; PNG, JPEG, WebP or GIF only, checked by the file's first bytes, 10 MB cap, served with `nosniff`); `images` helper in `app.js` (IndexedDB `img:<id>` in a browser); choose a file or paste a screenshot in the form; each upload gets a new id and the replaced file is deleted
 - [x] 8. Export / import: the zip carries `tracker.json`, `images/`, drafts in `pdfs/` and a readable `tracker.md`; the backup without PDFs carries the tracker inline. Import merges by id (rules in export-import.md); the dialog counts tracker entries; Replace clears the trackers too (`trackerFiles`, `importTracker`, `clearTracker` in `app.js`)
-- [ ] 9. Docs: README, About `FEATURES`, CHANGELOG, roadmap, architecture, data-model (each step also updates the docs it touches)
+- [x] 9. Docs: data-model (shape and SQLite tables), architecture, roadmap, CLAUDE.md, README; each step above updated README, About `FEATURES`, CHANGELOG and DEVELOPMENT as it went
 
-Later, if wanted: search across trackers.
+Later, if wanted: search across trackers; screenshots of the trackers in README.
 
 ## Decisions (2026-11-13)
 

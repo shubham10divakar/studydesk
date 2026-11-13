@@ -25,6 +25,15 @@ pip install studydesk && studydesk
 
 ---
 
+## New: trackers for your submissions and projects
+
+Not released yet; coming in the next version.
+
+- 🗓️ **Submissions:** the journals, special issues, book chapter calls and conferences you might submit to, with deadlines (AoE too), APC and zero-APC dates, Scopus or not, your own priority-ordered lists, and *Mark as submitted*.
+- 🛠️ **Projects:** a dated log of updates, next step, milestones, GitHub and other links, and a nudge when an active project goes quiet.
+- ✍️ **My papers:** your own manuscripts, aimed at a 1st, 2nd and 3rd choice and followed to the decision.
+- ⏰ **Upcoming:** every date across them, nearest first, also on the Overview.
+
 ## New in 1.1
 
 - 🔗 **Add a paper by link, without the PDF:** found it on Google Scholar but can't get the PDF? Keep the link, abstract, tags and notes now (paste Scholar's BibTeX to fill in the details) and attach the PDF later.
